@@ -58,6 +58,8 @@ async function calculateQuote(body: unknown) {
       data: {
         senderZip: data.senderZip,
         receiverZip: data.receiverZip,
+        origin: data.origin,
+        destination: data.destination,
         weight: data.weight,
         dimensions: { ...dimensionsCm, unit: "cm", enteredUnit: data.dimensions.unit },
         rate,

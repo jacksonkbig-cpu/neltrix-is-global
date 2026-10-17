@@ -26,6 +26,7 @@ function newTicketNumber() {
 
 export async function POST(request: NextRequest) {
   if (!(request.headers.get("content-type") ?? "").toLowerCase().includes("application/json")) return safeError("Send JSON.", 415);
+  if (Number(request.headers.get("content-length") ?? "0") > 100_000) return safeError("Request is too large.", 413);
   let raw: unknown;
   try { raw = await request.json(); } catch { return safeError("Invalid JSON.", 400); }
   const parsed = requestSchema.safeParse(raw);
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  if (data.action === "admin-resolve") {
+  if (data.action === "admin-resolve" || data.action === "admin-reply" || data.action === "admin-note") {\n    if (request.headers.get("origin") !== request.nextUrl.origin) return safeError("Request origin is not allowed.", 403);\n  }\n\n  if (data.action === "admin-resolve") {
     const staff = await getStaffContext(["ADMIN", "OPERATIONS_STAFF"]);
     if (!staff) return safeError("Unauthorized.", 401);
     if (!data.ticketNumber) return safeError("Ticket number is required.", 400);

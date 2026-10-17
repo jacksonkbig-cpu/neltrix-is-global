@@ -18,6 +18,7 @@ function responseError(message: string, status: number) {
 }
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  if (request.headers.get("origin") !== request.nextUrl.origin) return responseError("Request origin is not allowed.", 403);
   const staff = await getStaffContext(["ADMIN", "OPERATIONS_STAFF"]);
   if (!staff) return responseError("Unauthorized.", 401);
 

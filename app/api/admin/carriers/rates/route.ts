@@ -32,10 +32,12 @@ const rateRequestSchema = z.object({
 }).strict();
 
 export async function POST(request: NextRequest) {
+  if (request.headers.get("origin") !== request.nextUrl.origin) return NextResponse.json({ error: "Request origin is not allowed." }, { status: 403 });
   const staff = await getStaffContext(["ADMIN", "OPERATIONS_STAFF"]);
   if (!staff) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   if (!(request.headers.get("content-type") ?? "").toLowerCase().includes("application/json")) return NextResponse.json({ error: "Send JSON." }, { status: 415 });
 
+  if (Number(request.headers.get("content-length") ?? "0") > 20_000) return NextResponse.json({ error: "Request is too large." }, { status: 413 });
   let raw: unknown;
   try { raw = await request.json(); } catch { return NextResponse.json({ error: "Invalid JSON." }, { status: 400 }); }
   const parsed = rateRequestSchema.safeParse(raw);

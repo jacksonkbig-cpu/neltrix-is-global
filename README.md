@@ -1,6 +1,6 @@
 # NELTRIX I.S. Global — website starter
 
-A deployable Next.js starter for an international shipping business. It contains a responsive marketing site, shipment tracking lookup UI, quote request UI, and clear placeholder states. It is **not yet a live shipping platform**: tracking data, rate calculations, booking, authentication, payments, carrier APIs, and database persistence are not implemented.
+A Next.js foundation for NELTRIX I.S. Global. The quote intake and staff quote-review workflow require a separately configured Supabase project and applied migration. It is **not yet a live shipping platform**: carrier tracking, rate calculations, booking, crypto payments, and production deployment remain unimplemented.
 
 ## Requirements
 - Node.js 20.9+ (recommended)
@@ -28,16 +28,23 @@ Implemented:
 - Accessible mobile navigation menu
 - Baseline security headers and a simple application health endpoint
 - Tracking-number form with explicit “integration not connected” result
-- Quote request form with client-side validation and an explicit non-submission notice
+- Server-side quote request validation and a Supabase RPC persistence path (requires environment setup)
+- Supabase-authenticated staff sign-in and an operations-only quote review page
+- Database migration with row-level security and basic request rate limiting
+- Unit tests for quote request validation
 - Domain/production setup documentation
 
 Not implemented / not live:
-- No account creation or sign-in
+- No public account registration; staff authentication requires configured Supabase Auth and manually assigned ops roles
 - No real-time shipment tracking or carrier connection
 - No shipment creation, rates, labels, pickup dispatch, driver app, or operations console
 - No crypto payments or wallet monitoring
-- No database, email/SMS notifications, or customer data persistence
+- No production Supabase project configured in this repository; quote intake returns unavailable until setup is complete
+- No email/SMS notifications or customer self-service accounts
 - No production deployment or domain registration
+
+## Supabase quote-intake setup
+Follow [`docs/SUPABASE-SETUP.md`](docs/SUPABASE-SETUP.md) to configure a Supabase project, apply the migration, set server-only environment variables, and assign staff access. Do not submit real customer data until the checklist is complete.
 
 ## Recommended next milestones
 1. Confirm company legal name, launch locations, domain, and legal operating model.

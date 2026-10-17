@@ -9,6 +9,7 @@ CREATE TABLE "Ticket" (
   "id" TEXT NOT NULL,
   "ticketNumber" TEXT NOT NULL,
   "userId" TEXT,
+  "customerEmail" TEXT,
   "status" "TicketStatus" NOT NULL DEFAULT 'OPEN',
   "priority" "TicketPriority" NOT NULL DEFAULT 'NORMAL',
   "subject" TEXT NOT NULL,

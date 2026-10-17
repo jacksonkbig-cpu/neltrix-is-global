@@ -62,6 +62,8 @@ model Quote {
   id          String      @id @default(cuid())
   senderZip   String
   receiverZip String
+  origin      String
+  destination String
   weight      Decimal     @db.Decimal(10, 2)
   dimensions  Json
   rate        Decimal     @db.Decimal(12, 2)

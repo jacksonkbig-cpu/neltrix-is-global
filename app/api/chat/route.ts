@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { trackingNumberSchema } from "@/lib/logistics/validation";
+import { lookupCarrier } from "@/lib/logistics/carrier";
 import { getStaffContext } from "@/lib/authz";
 
 export const runtime = "nodejs";
@@ -120,9 +121,14 @@ export async function POST(request: NextRequest) {
         where: { trackingNumber: data.trackingNumber },
         select: { trackingNumber: true, status: true, origin: true, destination: true, carrier: true, estimatedDelivery: true },
       });
-      trackingContext = shipment
-        ? JSON.stringify({ trackingNumber: shipment.trackingNumber, status: shipment.status, origin: shipment.origin, destination: shipment.destination, carrier: shipment.carrier, estimatedDelivery: shipment.estimatedDelivery?.toISOString() ?? null })
-        : "The supplied tracking number was not found in the local database. Do not invent a tracking result.";
+      if (shipment) {
+        trackingContext = JSON.stringify({ trackingNumber: shipment.trackingNumber, status: shipment.status, origin: shipment.origin, destination: shipment.destination, carrier: shipment.carrier, estimatedDelivery: shipment.estimatedDelivery?.toISOString() ?? null, source: "database" });
+      } else {
+        const carrierResult = await lookupCarrier(data.trackingNumber);
+        trackingContext = carrierResult
+          ? JSON.stringify({ ...carrierResult, demoOnly: carrierResult.source === "mock" })
+          : "The supplied tracking number was not found in the local database or configured carrier provider. Do not invent a tracking result.";
+      }
     } catch {
       trackingContext = "Tracking lookup is currently unavailable. Do not invent a tracking result.";
     }

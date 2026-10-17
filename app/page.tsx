@@ -1,7 +1,7 @@
  "use client";
 
 import { useState } from "react";
-import { ArrowRight, Globe2, ShieldCheck, Clock3, Headphones, Package, Plane, Ship, Truck, MapPin, Menu, Search, CircleDollarSign } from "lucide-react";
+import { ArrowRight, Globe2, ShieldCheck, Clock3, Headphones, Package, Plane, Ship, Truck, MapPin, Menu } from "lucide-react";
 
 const services = [
   { icon: Package, title: "Express Delivery", copy: "Fast, reliable delivery for documents and smaller packages." },
@@ -14,6 +14,7 @@ export default function Home() {
   const [tracking, setTracking] = useState("");
   const [trackMessage, setTrackMessage] = useState("");
   const [quoteSent, setQuoteSent] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   function trackShipment(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -32,9 +33,9 @@ export default function Home() {
         <span className="brand-mark">N</span><span className="brand-copy"><strong>NELTRIX</strong><small>I.S. Global</small></span>
         <span className="brand-sub">INTERNATIONAL<br/>SHIPPING</span>
       </a>
-      <nav><a href="#home">Home</a><a href="#services">Services</a><a href="#track">Track Shipment</a><a href="#about">About Us</a><a href="#quote">Get a Quote</a></nav>
+      <nav id="primary-navigation" className={mobileMenuOpen ? "nav-links nav-open" : "nav-links"}><a href="#home" onClick={() => setMobileMenuOpen(false)}>Home</a><a href="#services" onClick={() => setMobileMenuOpen(false)}>Services</a><a href="#track" onClick={() => setMobileMenuOpen(false)}>Track Shipment</a><a href="#about" onClick={() => setMobileMenuOpen(false)}>About Us</a><a href="#quote" onClick={() => setMobileMenuOpen(false)}>Get a Quote</a></nav>
       <a className="nav-cta" href="#quote">Request a quote <ArrowRight size={16}/></a>
-      <button className="mobile-menu" aria-label="Menu"><Menu/></button>
+      <button className="mobile-menu" type="button" aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"} aria-expanded={mobileMenuOpen} aria-controls="primary-navigation" onClick={() => setMobileMenuOpen((open) => !open)}><Menu/></button>
     </header>
 
     <section className="hero" id="home">
@@ -47,7 +48,7 @@ export default function Home() {
         <div className="hero-note"><ShieldCheck size={17}/> A customer-first logistics network built around clarity and care.</div>
       </div>
       <div className="hero-stats">
-        <div><Globe2/><span><b>Global reach</b><small>Coverage through verified partners</small></span></div>
+        <div><Globe2/><span><b>Brazil ↔ United States</b><small>Initial corridor focus</small></span></div>
         <div><ShieldCheck/><span><b>Secure handling</b><small>Care at every step</small></span></div>
         <div><Clock3/><span><b>Shipment visibility</b><small>Tracking integrations coming next</small></span></div>
         <div><Headphones/><span><b>Human support</b><small>Help when you need it</small></span></div>
@@ -55,7 +56,7 @@ export default function Home() {
     </section>
 
     <section className="track-section" id="track">
-      <div className="track-heading"><div className="track-icon"><Package/></div><div><h2>Track your shipment</h2><p>Enter your tracking number to check a shipment.</p></div></div>
+      <div className="track-heading"><div className="track-icon"><Package/></div><div><h2>Track your shipment</h2><p>Tracking will be available after verified carrier integration is connected.</p></div></div>
       <form className="track-form" onSubmit={trackShipment}>
         <label className="sr-only" htmlFor="tracking">Tracking number</label><input id="tracking" value={tracking} onChange={e=>{setTracking(e.target.value);setTrackMessage("");}} placeholder="Enter tracking number" />
         <button className="button primary" type="submit">Track <ArrowRight size={17}/></button>
@@ -70,7 +71,7 @@ export default function Home() {
 
     <section className="about section" id="about">
       <div className="world-art"><div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="world-dot dot-one"/><div className="world-dot dot-two"/><div className="world-dot dot-three"/><Globe2 size={180} strokeWidth={0.6}/></div>
-      <div className="about-copy"><div className="eyebrow">OUR REACH</div><h2>Connecting businesses<br/>across borders.</h2><p>Our launch plan focuses on Brazil, the United States, and selected markets where delivery coverage, carrier services, and operating requirements can be verified.</p><div className="regions"><span>🇧🇷 Brazil</span><span>🇺🇸 United States</span><span>🇪🇺 Selected European markets</span><span>🌏 Additional approved markets</span></div></div>
+      <div className="about-copy"><div className="eyebrow">OUR REACH</div><h2>Connecting businesses<br/>across borders.</h2><p>Our initial launch focus is the Brazil–United States corridor in both directions. Service will be activated only when carrier coverage, customs processes, pricing, and operating requirements have been verified.</p><div className="regions"><span>🇧🇷 Brazil</span><span>↔</span><span>🇺🇸 United States</span></div></div>
       <div className="commitment"><ShieldCheck size={34}/><h3>Your shipment.<br/>Our commitment.</h3><p>Clear communication, responsible handling, and dependable service are the standards we’re working toward.</p></div>
     </section>
 

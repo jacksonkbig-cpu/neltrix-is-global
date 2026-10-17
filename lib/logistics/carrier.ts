@@ -1,4 +1,5 @@
 import "server-only";
+import { z } from "zod";
 import type { ShipmentStatus } from "@prisma/client";
 import { trackingNumberSchema } from "@/lib/logistics/validation";
 
@@ -12,22 +13,31 @@ export type TrackingResult = {
   source: "database" | "carrier" | "mock";
 };
 
-type CarrierPayload = {
-  trackingNumber?: string;
-  status?: string;
-  origin?: string;
-  destination?: string;
-  carrier?: string;
-  estimatedDelivery?: string | null;
-};
+const carrierPayloadSchema = z.object({
+  trackingNumber: z.string().trim().min(1).max(100).optional(),
+  status: z.string().trim().min(1).max(80).optional(),
+  origin: z.string().trim().max(100).optional(),
+  destination: z.string().trim().max(100).optional(),
+  carrier: z.string().trim().max(80).optional(),
+  estimatedDelivery: z.string().datetime({ offset: true }).nullable().optional(),
+});
 
 function mapStatus(status: string | undefined): TrackingResult["status"] {
   switch (status?.toLowerCase().replace(/[ -]/g, "_")) {
-    case "pending": case "label_created": return "PENDING";
-    case "in_transit": case "out_for_delivery": return "IN_TRANSIT";
-    case "delivered": return "DELIVERED";
-    case "exception": case "failed": case "delivery_exception": return "EXCEPTION";
-    default: return "UNKNOWN";
+    case "pending":
+    case "label_created":
+      return "PENDING";
+    case "in_transit":
+    case "out_for_delivery":
+      return "IN_TRANSIT";
+    case "delivered":
+      return "DELIVERED";
+    case "exception":
+    case "failed":
+    case "delivery_exception":
+      return "EXCEPTION";
+    default:
+      return "UNKNOWN";
   }
 }
 
@@ -42,6 +52,7 @@ export async function lookupCarrier(trackingNumber: string): Promise<TrackingRes
     const url = new URL(endpoint);
     if (url.protocol !== "https:") throw new Error("Carrier endpoint must use HTTPS.");
     url.searchParams.set("trackingNumber", parsed.data);
+
     const response = await fetch(url, {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
       signal: AbortSignal.timeout(5000),
@@ -49,14 +60,28 @@ export async function lookupCarrier(trackingNumber: string): Promise<TrackingRes
     });
     if (response.status === 404) return null;
     if (!response.ok) throw new Error("Carrier provider returned an unsuccessful response.");
-    const payload = (await response.json()) as CarrierPayload;
+
+    const raw: unknown = await response.json();
+    const result = carrierPayloadSchema.safeParse(raw);
+    if (!result.success) throw new Error("Carrier provider returned an invalid payload.");
+
+    const payload = result.data;
+    if (
+      payload.trackingNumber &&
+      payload.trackingNumber.trim().toUpperCase() !== parsed.data.toUpperCase()
+    ) {
+      throw new Error("Carrier provider returned a different tracking number.");
+    }
+
     return {
       trackingNumber: parsed.data,
       status: mapStatus(payload.status),
-      origin: typeof payload.origin === "string" ? payload.origin.slice(0, 100) : null,
-      destination: typeof payload.destination === "string" ? payload.destination.slice(0, 100) : null,
-      carrier: typeof payload.carrier === "string" ? payload.carrier.slice(0, 80) : "External carrier",
-      estimatedDelivery: payload.estimatedDelivery ?? null,
+      origin: payload.origin || null,
+      destination: payload.destination || null,
+      carrier: payload.carrier || "External carrier",
+      estimatedDelivery: payload.estimatedDelivery
+        ? new Date(payload.estimatedDelivery).toISOString()
+        : null,
       source: "carrier",
     };
   }

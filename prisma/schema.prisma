@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  CARRIER
+}
+
+enum ShipmentStatus {
+  PENDING
+  IN_TRANSIT
+  DELIVERED
+  EXCEPTION
+}
+
+enum QuoteStatus {
+  PENDING
+  PRICED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  role         UserRole   @default(USER)
+  shipments    Shipment[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([role])
+}
+
+model Shipment {
+  id                String         @id @default(cuid())
+  trackingNumber    String         @unique
+  status            ShipmentStatus @default(PENDING)
+  origin            String
+  destination       String
+  carrier           String
+  estimatedDelivery DateTime?
+  userId            String?
+  user              User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status, updatedAt])
+}
+
+model Quote {
+  id          String      @id @default(cuid())
+  senderZip   String
+  receiverZip String
+  weight      Decimal     @db.Decimal(10, 2)
+  dimensions  Json
+  rate        Decimal     @db.Decimal(12, 2)
+  currency    String      @default("USD") @db.Char(3)
+  status      QuoteStatus @default(PENDING)
+  createdAt   DateTime    @default(now())
+
+  @@index([createdAt])
+  @@index([status, createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  ipAddress String?
+  userAgent String?
+  timestamp DateTime @default(now())
+
+  @@index([timestamp])
+  @@index([action, timestamp])
+}

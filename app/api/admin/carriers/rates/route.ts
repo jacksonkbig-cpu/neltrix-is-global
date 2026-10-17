@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
   if (!provider) return NextResponse.json({ error: "Live carrier rates are not configured." }, { status: 503 });
   try {
     const rates = await provider.getRates(parsed.data as RateRequest);
-    return NextResponse.json({ rates, binding: true, provider: "EasyPost", disclaimer: "Rates can change until a carrier label is purchased." }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ rates, binding: false, rateType: "CARRIER_QUOTE", provider: "EasyPost", disclaimer: "Carrier-provided rates are estimates and are not binding until the carrier accepts a purchase." }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return NextResponse.json({ error: "Carrier rates are temporarily unavailable." }, { status: 503 });
   }

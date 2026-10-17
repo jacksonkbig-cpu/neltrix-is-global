@@ -122,7 +122,7 @@ export default function Home() {
         <p className="quote-privacy">Submitting sends your contact details to NELTRIX for quote follow-up. Do not submit sensitive personal data. Privacy and retention policies must be published before public launch.</p>
         <button className="button primary" type="submit" disabled={quoteBusy}>{quoteBusy ? "Submitting securely…" : "Submit quote request"} <ArrowRight size={17}/></button>
         {quoteMessage && <p className={quoteSent ? "notice success-notice" : "notice"} role="status">{quoteMessage}</p>}
-      </form>/form>
+      </form>
     </section>
 
     <footer><a className="brand footer-brand" href="#home"><span className="brand-mark">N</span><span className="brand-copy"><strong>NELTRIX</strong><small>I.S. Global</small></span></a><p>International Shipping · Freight · Logistics</p><span>© {new Date().getFullYear()} NELTRIX I.S. Global. Working brand name; legal clearance pending.</span></footer>

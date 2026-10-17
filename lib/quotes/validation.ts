@@ -18,7 +18,7 @@ export const quoteRequestSchema = z.object({
     "Not sure yet",
   ]),
   details: z.string().trim().max(2000).optional().default(""),
-  website: z.string().max(0).optional().default(""),
+  website: z.string().max(200).optional().default(""),
 }).superRefine((value, context) => {
   if (value.originCountry === value.destinationCountry) {
     context.addIssue({

@@ -10,7 +10,7 @@ export default async function AdminSupportPage() {
     where: { status: { in: ["OPEN", "IN_PROGRESS"] } },
     orderBy: [{ priority: "desc" }, { updatedAt: "desc" }],
     take: 100,
-    include: { messages: { where: { isInternalNote: false }, orderBy: { createdAt: "asc" }, take: 20 } },
+    include: { messages: { orderBy: { createdAt: "asc" }, take: 20 } },
   });
   return (
     <main className="mx-auto max-w-6xl p-6 text-slate-900">

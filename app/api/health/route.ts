@@ -3,8 +3,10 @@ import { db } from "@/lib/db";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Module-scoped process start time; serverless instances each report their own uptime.
+const processStartedAt = Date.now();
+
 export async function GET() {
-  const startedAt = process.env.APP_STARTED_AT ? Number(process.env.APP_STARTED_AT) : Date.now();
   let database: "ok" | "unavailable" = "ok";
   try {
     await db.$queryRaw`SELECT 1`;
@@ -16,7 +18,7 @@ export async function GET() {
   return Response.json({
     status: healthy ? "ok" : "degraded",
     service: "neltrix-web",
-    uptimeSeconds: Math.max(0, Math.floor((Date.now() - startedAt) / 1000)),
+    uptimeSeconds: Math.max(0, Math.floor((Date.now() - processStartedAt) / 1000)),
     checks: { database },
     timestamp: new Date().toISOString(),
   }, { status: healthy ? 200 : 503, headers: { "Cache-Control": "no-store" } });

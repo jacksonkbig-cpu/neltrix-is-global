@@ -5,7 +5,7 @@ import type { CarrierProvider, CarrierTracking, CarrierRate, RateRequest, LabelP
 const eventSchema = z.object({
   status: z.string().optional(),
   message: z.string().optional(),
-  datetime: z.string().nullable().optional(),
+  datetime: z.string().datetime({ offset: true }).nullable().optional(),
   tracking_location: z.object({ city: z.string().nullable().optional(), state: z.string().nullable().optional(), country: z.string().nullable().optional() }).nullable().optional(),
 });
 const addressSchema = z.object({ city: z.string().optional(), state: z.string().optional(), country: z.string().optional() });
@@ -13,7 +13,7 @@ const trackerSchema = z.object({
   tracking_code: z.string(),
   carrier: z.string().optional(),
   status: z.string().optional(),
-  est_delivery_date: z.string().nullable().optional(),
+  est_delivery_date: z.string().datetime({ offset: true }).nullable().optional(),
   tracking_details: z.array(eventSchema).optional(),
   from_address: addressSchema.optional(),
   to_address: addressSchema.optional(),

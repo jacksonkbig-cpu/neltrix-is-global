@@ -16,6 +16,8 @@ Open http://localhost:3000.
 
 ## Production build check
 ```bash
+npm run lint
+npm run typecheck
 npm run build
 npm start
 ```
@@ -23,6 +25,8 @@ npm start
 ## Current status
 Implemented:
 - Responsive landing page and services overview
+- Accessible mobile navigation menu
+- Baseline security headers and a simple application health endpoint
 - Tracking-number form with explicit “integration not connected” result
 - Quote request form with client-side validation and an explicit non-submission notice
 - Domain/production setup documentation

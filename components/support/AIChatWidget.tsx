@@ -76,7 +76,7 @@ export default function AIChatWidget() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "handoff", message }),
+        body: JSON.stringify({ action: "handoff", message, messages: messages.slice(-20) }),
       });
       const data = await response.json() as { ticket?: { ticketNumber?: string }; error?: string };
       if (!response.ok || !data.ticket?.ticketNumber) throw new Error(data.error ?? "Could not create support ticket.");

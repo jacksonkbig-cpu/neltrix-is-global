@@ -14,8 +14,8 @@ export type RateRequest = {
   parcel: { length: number; width: number; height: number; distanceUnit: "cm" | "in"; weight: number; massUnit: "kg" | "lb" };
 };
 
-export type CarrierRate = { provider: string; service: string; amount: number; currency: string; estimatedDays: number | null; rateId: string };
-export type LabelPurchaseRequest = { rateId: string; labelFormat?: "PDF" | "PNG" | "ZPL" };
+export type CarrierRate = { provider: string; service: string; amount: number; currency: string; estimatedDays: number | null; rateId: string; shipmentId: string };
+export type LabelPurchaseRequest = { shipmentId: string; rateId: string; labelFormat?: "PDF" | "PNG" | "ZPL" };
 
 export interface CarrierProvider {
   getTracking(trackingNumber: string, carrier?: string): Promise<CarrierTracking | null>;

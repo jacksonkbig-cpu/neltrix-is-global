@@ -1,5 +1,5 @@
 import "server-only";
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -15,7 +15,7 @@ export async function getStaffContext(allowedRoles: StaffRole[] = ["ADMIN", "OPE
   const supabase = createServerClient(url, anonKey, {
     cookies: {
       getAll: () => cookieStore.getAll(),
-      setAll(values) {
+      setAll(values: { name: string; value: string; options: CookieOptions }[]) {
         try {
           values.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
         } catch {

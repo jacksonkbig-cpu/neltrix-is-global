@@ -14,6 +14,8 @@ export default function Home() {
   const [tracking, setTracking] = useState("");
   const [trackMessage, setTrackMessage] = useState("");
   const [quoteSent, setQuoteSent] = useState(false);
+  const [quoteMessage, setQuoteMessage] = useState("");
+  const [quoteBusy, setQuoteBusy] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   function trackShipment(e: React.FormEvent<HTMLFormElement>) {
@@ -22,9 +24,36 @@ export default function Home() {
     setTrackMessage("Live tracking is not connected yet. No shipment lookup was performed. Connect a carrier API before using this service.");
   }
 
-  function requestQuote(e: React.FormEvent<HTMLFormElement>) {
+  async function requestQuote(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setQuoteSent(true);
+    setQuoteMessage("");
+    setQuoteSent(false);
+    setQuoteBusy(true);
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    const payload = Object.fromEntries(formData.entries());
+
+    try {
+      const response = await fetch("/api/quotes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json() as { ok?: boolean; requestId?: string | null; error?: string; fields?: Record<string, string[]> };
+      if (!response.ok || !result.ok) {
+        setQuoteMessage(result.error ?? "We could not submit your request. Please review the fields and try again.");
+        return;
+      }
+      setQuoteSent(true);
+      setQuoteMessage(result.requestId
+        ? `Your request was saved. Reference: ${result.requestId}. This is a request for review, not a confirmed quote or booking.`
+        : "Your request could not be stored. Please contact support.");
+      if (result.requestId) form.reset();
+    } catch {
+      setQuoteMessage("We could not reach the quote service. No confirmation was received; please try again later.");
+    } finally {
+      setQuoteBusy(false);
+    }
   }
 
   return <main>
@@ -78,12 +107,22 @@ export default function Home() {
     <section className="quote-section section" id="quote">
       <div><div className="eyebrow dark">LET’S GET MOVING</div><h2>Tell us what you need to ship.</h2><p>Share your shipment details and prepare a request for the NELTRIX team.</p></div>
       <form className="quote-form" onSubmit={requestQuote}>
-        <div className="form-row"><label>Full name<input required placeholder="Your name" /></label><label>Email address<input required type="email" placeholder="you@company.com" /></label></div>
-        <div className="form-row"><label>Origin country<input required placeholder="e.g. Brazil" /></label><label>Destination country<input required placeholder="e.g. United States" /></label></div>
-        <label>What are you shipping?<select defaultValue="" required><option value="" disabled>Select shipment type</option><option>Documents or parcel</option><option>Commercial cargo</option><option>Air freight</option><option>Ocean freight</option><option>Not sure yet</option></select></label>
-        <button className="button primary" type="submit">Prepare quote request <ArrowRight size={17}/></button>
-        {quoteSent && <p className="notice">This form is a front-end prototype only. Your details have not been sent or saved. Connect a secure backend before accepting real customer requests.</p>}
-      </form>
+        <div className="form-row">
+          <label>Full name<input name="fullName" autoComplete="name" required minLength={2} maxLength={100} placeholder="Your name" /></label>
+          <label>Email address<input name="email" autoComplete="email" required type="email" maxLength={254} placeholder="you@company.com" /></label>
+        </div>
+        <label>Phone (optional)<input name="phone" autoComplete="tel" type="tel" maxLength={40} placeholder="Phone number with country code" /></label>
+        <div className="form-row">
+          <label>Origin country<select name="originCountry" defaultValue="" required><option value="" disabled>Select origin</option><option value="Brazil">Brazil</option><option value="United States">United States</option></select></label>
+          <label>Destination country<select name="destinationCountry" defaultValue="" required><option value="" disabled>Select destination</option><option value="Brazil">Brazil</option><option value="United States">United States</option></select></label>
+        </div>
+        <label>What are you shipping?<select name="shipmentType" defaultValue="" required><option value="" disabled>Select shipment type</option><option>Documents or parcel</option><option>Commercial cargo</option><option>Air freight</option><option>Ocean freight</option><option>Not sure yet</option></select></label>
+        <label>Shipment details (optional)<textarea name="details" rows={4} maxLength={2000} placeholder="General description, approximate size/weight, or timing. Do not include payment details or sensitive personal information." /></label>
+        <div className="quote-honeypot" aria-hidden="true"><label>Leave this field empty<input name="website" tabIndex={-1} autoComplete="off" /></label></div>
+        <p className="quote-privacy">Submitting sends your contact details to NELTRIX for quote follow-up. Do not submit sensitive personal data. Privacy and retention policies must be published before public launch.</p>
+        <button className="button primary" type="submit" disabled={quoteBusy}>{quoteBusy ? "Submitting securely…" : "Submit quote request"} <ArrowRight size={17}/></button>
+        {quoteMessage && <p className={quoteSent ? "notice success-notice" : "notice"} role="status">{quoteMessage}</p>}
+      </form>/form>
     </section>
 
     <footer><a className="brand footer-brand" href="#home"><span className="brand-mark">N</span><span className="brand-copy"><strong>NELTRIX</strong><small>I.S. Global</small></span></a><p>International Shipping · Freight · Logistics</p><span>© {new Date().getFullYear()} NELTRIX I.S. Global. Working brand name; legal clearance pending.</span></footer>

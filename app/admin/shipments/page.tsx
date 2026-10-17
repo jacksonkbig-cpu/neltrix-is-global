@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireStaff } from "@/lib/authz";
 import ShipmentActions from "@/components/admin/ShipmentActions";
@@ -37,7 +38,7 @@ export default async function AdminShipmentsPage({ searchParams }: { searchParam
       <form method="get" className="mb-4 flex flex-wrap gap-2 rounded-xl border bg-white p-3">
         <label className="sr-only" htmlFor="shipment-query">Search shipments</label><input id="shipment-query" name="q" defaultValue={query} placeholder="Tracking, origin, destination" maxLength={64} className="min-w-56 flex-1 rounded-lg border p-2 text-sm" />
         <label className="sr-only" htmlFor="shipment-status">Filter status</label><select id="shipment-status" name="status" defaultValue={status ?? ""} className="rounded-lg border p-2 text-sm"><option value="">All statuses</option>{statuses.map((value) => <option key={value} value={value}>{value.replace("_", " ")}</option>)}</select>
-        <button className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white">Filter</button><a href="/admin/shipments" className="rounded-lg border px-4 py-2 text-sm">Reset</a>
+        <button className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white">Filter</button><Link href="/admin/shipments" className="rounded-lg border px-4 py-2 text-sm">Reset</Link>
       </form>
       <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
         <table className="w-full min-w-[1000px] text-left text-sm">

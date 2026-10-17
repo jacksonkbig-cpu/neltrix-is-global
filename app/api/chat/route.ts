@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const requestSchema = z.object({
-  action: z.enum(["chat", "handoff", "admin-reply"]).default("chat"),
+  action: z.enum(["chat", "handoff", "admin-reply", "admin-note"]).default("chat"),
   message: z.string().trim().min(1).max(4000).optional(),
   messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().trim().min(1).max(4000) })).max(20).optional(),
   ticketNumber: z.string().trim().max(40).optional(),
@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
       const ticket = await db.ticket.create({
         data: {
           ticketNumber: newTicketNumber(),
+          customerEmail: data.email?.toLowerCase(),
           subject: data.message.slice(0, 120),
           messages: { create: (data.messages?.length ? data.messages : [{ role: "user" as const, content: data.message }]).slice(-20).map((item) => ({ sender: item.role === "assistant" ? "AI" as const : "CUSTOMER" as const, message: item.content, isInternalNote: false })) },
         },
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  if (data.action === "admin-reply") {
+  if (data.action === "admin-reply" || data.action === "admin-note") {
     const staff = await getStaffContext(["ADMIN", "OPERATIONS_STAFF"]);
     if (!staff) return safeError("Unauthorized.", 401);
     if (!data.ticketNumber || !data.message) return safeError("Ticket number and reply are required.", 400);
@@ -73,9 +74,9 @@ export async function POST(request: NextRequest) {
       const ticket = await db.ticket.findUnique({ where: { ticketNumber: data.ticketNumber }, select: { id: true } });
       if (!ticket) return safeError("Ticket not found.", 404);
       await db.$transaction([
-        db.chatMessage.create({ data: { ticketId: ticket.id, sender: "ADMIN", message: data.message, isInternalNote: false } }),
+        db.chatMessage.create({ data: { ticketId: ticket.id, sender: "ADMIN", message: data.message, isInternalNote: data.action === "admin-note" } }),
         db.ticket.update({ where: { id: ticket.id }, data: { status: "IN_PROGRESS" } }),
-        db.auditLog.create({ data: { action: "support.reply", userId: null, ipAddress: request.headers.get("x-real-ip")?.slice(0, 64), userAgent: request.headers.get("user-agent")?.slice(0, 300) } }),
+        db.auditLog.create({ data: { action: data.action === "admin-note" ? "support.internal_note" : "support.reply", userId: null, ipAddress: request.headers.get("x-real-ip")?.slice(0, 64), userAgent: request.headers.get("user-agent")?.slice(0, 300) } }),
       ]);
       return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
     } catch {

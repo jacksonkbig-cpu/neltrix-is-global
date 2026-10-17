@@ -28,7 +28,7 @@ function status(value?: string): CarrierTracking["status"] {
     default: return "UNKNOWN";
   }
 }
-function address(value?: { city?: string; state?: string; country?: string }) {
+function address(value?: { city?: string | null; state?: string | null; country?: string | null } | null) {
   if (!value) return null;
   return [value.city, value.state, value.country].filter(Boolean).join(", ") || null;
 }

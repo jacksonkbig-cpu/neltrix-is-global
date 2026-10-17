@@ -58,6 +58,7 @@ model User {
   passwordHash String
   role         UserRole    @default(USER)
   shipments    Shipment[]
+  shipmentNotes ShipmentNote[]
   tickets      Ticket[]
   auditLogs    AuditLog[]
   createdAt    DateTime    @default(now())
@@ -81,6 +82,20 @@ model Shipment {
 
   @@index([userId, createdAt])
   @@index([status, updatedAt])
+  notes             ShipmentNote[]
+}
+
+model ShipmentNote {
+  id         String   @id @default(cuid())
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  authorId   String?
+  author     User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  note       String   @db.Text
+  createdAt  DateTime @default(now())
+
+  @@index([shipmentId, createdAt])
+  @@index([authorId, createdAt])
 }
 
 model Quote {

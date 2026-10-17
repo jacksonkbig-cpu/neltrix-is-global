@@ -11,6 +11,7 @@ export default function AIChatWidget() {
   ]);
   const [draft, setDraft] = useState("");
   const [trackingNumber, setTrackingNumber] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [ticket, setTicket] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -77,7 +78,7 @@ export default function AIChatWidget() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "handoff", message, messages: messages.slice(-20) }),
+        body: JSON.stringify({ action: "handoff", message, messages: messages.slice(-20), ...(customerEmail.trim() ? { email: customerEmail.trim() } : {}) }),
       });
       const data = await response.json() as { ticket?: { ticketNumber?: string }; error?: string };
       if (!response.ok || !data.ticket?.ticketNumber) throw new Error(data.error ?? "Could not create support ticket.");
@@ -107,7 +108,7 @@ export default function AIChatWidget() {
             {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
           </div>
           <form className="border-t border-slate-200 p-3" onSubmit={(event) => { event.preventDefault(); void sendMessage(); }}>
-            <label htmlFor="neltrix-chat-tracking" className="mb-1 block text-xs font-medium text-slate-600">Optional tracking number</label><input id="neltrix-chat-tracking" value={trackingNumber} onChange={(event) => setTrackingNumber(event.target.value)} maxLength={64} className="mb-2 w-full rounded-lg border border-slate-300 p-2 text-sm text-slate-900 outline-none focus:border-blue-600" placeholder="Enter tracking number for status lookup" /><label htmlFor="neltrix-chat-message" className="sr-only">Your message</label>
+            <label htmlFor="neltrix-chat-email" className="mb-1 block text-xs font-medium text-slate-600">Email for support follow-up (optional)</label><input id="neltrix-chat-email" type="email" value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} maxLength={254} className="mb-2 w-full rounded-lg border border-slate-300 p-2 text-sm text-slate-900 outline-none focus:border-blue-600" placeholder="you@example.com" /><label htmlFor="neltrix-chat-tracking" className="mb-1 block text-xs font-medium text-slate-600">Optional tracking number</label><input id="neltrix-chat-tracking" value={trackingNumber} onChange={(event) => setTrackingNumber(event.target.value)} maxLength={64} className="mb-2 w-full rounded-lg border border-slate-300 p-2 text-sm text-slate-900 outline-none focus:border-blue-600" placeholder="Enter tracking number for status lookup" /><label htmlFor="neltrix-chat-message" className="sr-only">Your message</label>
             <textarea id="neltrix-chat-message" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={4000} rows={2} className="w-full resize-none rounded-lg border border-slate-300 p-2 text-sm text-slate-900 outline-none focus:border-blue-600" placeholder="How can we help?" />
             <div className="mt-2 flex gap-2">
               <button type="submit" disabled={busy || !draft.trim()} className="flex-1 rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? "Working…" : "Send"}</button>

@@ -5,6 +5,7 @@ const sensitiveLimits: Record<string, string> = {
   "/api/tracking": "RATE_LIMIT_TRACKING_PER_MINUTE",
   "/api/quotes": "RATE_LIMIT_QUOTES_PER_MINUTE",
   "/api/chat": "RATE_LIMIT_CHAT_PER_MINUTE",
+  "/api/admin/carriers/rates": "RATE_LIMIT_ADMIN_PER_MINUTE",
 };
 
 const RATE_LIMIT_SCRIPT = [
@@ -14,7 +15,8 @@ const RATE_LIMIT_SCRIPT = [
 ].join("\n");
 
 async function applyRateLimit(request: NextRequest): Promise<NextResponse | null> {
-  const envName = sensitiveLimits[request.nextUrl.pathname];
+  const path = request.nextUrl.pathname;
+  const envName = sensitiveLimits[path] ?? (path.startsWith("/api/admin/shipments/") ? "RATE_LIMIT_ADMIN_PER_MINUTE" : undefined);
   if (!envName) return null;
   const redisUrl = process.env.RATE_LIMIT_REDIS_REST_URL;
   const redisToken = process.env.RATE_LIMIT_REDIS_REST_TOKEN;

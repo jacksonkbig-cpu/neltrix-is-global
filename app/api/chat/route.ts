@@ -67,7 +67,11 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  if (data.action === "admin-resolve" || data.action === "admin-reply" || data.action === "admin-note") {\n    if (request.headers.get("origin") !== request.nextUrl.origin) return safeError("Request origin is not allowed.", 403);\n  }\n\n  if (data.action === "admin-resolve") {
+  if (data.action === "admin-resolve" || data.action === "admin-reply" || data.action === "admin-note") {
+    if (request.headers.get("origin") !== request.nextUrl.origin) return safeError("Request origin is not allowed.", 403);
+  }
+
+  if (data.action === "admin-resolve") {
     const staff = await getStaffContext(["ADMIN", "OPERATIONS_STAFF"]);
     if (!staff) return safeError("Unauthorized.", 401);
     if (!data.ticketNumber) return safeError("Ticket number is required.", 400);

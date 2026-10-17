@@ -21,7 +21,7 @@ async function applyRateLimit(request: NextRequest): Promise<NextResponse | null
 
   // Only trust the hosting platform's forwarded address. Never accept a client-supplied
   // X-Forwarded-For chain as authoritative on a deployment without a trusted proxy.
-  const ip = request.ip ?? request.headers.get("x-real-ip") ?? "unknown";
+  const ip = request.headers.get("x-real-ip") ?? "unknown";
   const minute = Math.floor(Date.now() / 60_000);
   const key = `neltrix:ratelimit:${request.nextUrl.pathname}:${minute}:${ip}`;
   const limit = Math.max(1, Number.parseInt(process.env[envName] ?? "30", 10) || 30);

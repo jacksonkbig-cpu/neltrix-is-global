@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const requestSchema = z.object({
-  action: z.enum(["chat", "handoff", "admin-reply", "admin-note"]).default("chat"),
+  action: z.enum(["chat", "handoff", "admin-reply", "admin-note", "admin-resolve"]).default("chat"),
   message: z.string().trim().min(1).max(4000).optional(),
   messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().trim().min(1).max(4000) })).max(20).optional(),
   ticketNumber: z.string().trim().max(40).optional(),
@@ -63,6 +63,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ticket, message: "Your request has been sent to our support team." }, { status: 201, headers: { "Cache-Control": "no-store" } });
     } catch {
       return safeError("We could not create a support ticket. Please try again later.", 503);
+    }
+  }
+
+  if (data.action === "admin-resolve") {
+    const staff = await getStaffContext(["ADMIN", "OPERATIONS_STAFF"]);
+    if (!staff) return safeError("Unauthorized.", 401);
+    if (!data.ticketNumber) return safeError("Ticket number is required.", 400);
+    try {
+      const ticket = await db.ticket.findUnique({ where: { ticketNumber: data.ticketNumber }, select: { id: true } });
+      if (!ticket) return safeError("Ticket not found.", 404);
+      await db.$transaction([
+        db.ticket.update({ where: { id: ticket.id }, data: { status: "RESOLVED" } }),
+        db.auditLog.create({ data: { action: `support.resolve actor=${staff.email.slice(0, 120)}`, ipAddress: request.headers.get("x-real-ip")?.slice(0, 64), userAgent: request.headers.get("user-agent")?.slice(0, 300) } }),
+      ]);
+      return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
+    } catch {
+      return safeError("Ticket could not be resolved.", 503);
     }
   }
 

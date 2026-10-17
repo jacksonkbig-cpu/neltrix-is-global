@@ -34,6 +34,8 @@ test("rejects malformed email and oversized details", () => {
   assert.equal(quoteRequestSchema.safeParse({ ...validRequest, details: "x".repeat(2001) }).success, false);
 });
 
-test("rejects non-empty honeypot submissions", () => {
-  assert.equal(quoteRequestSchema.safeParse({ ...validRequest, website: "bot" }).success, false);
+test("parses the honeypot field so the API can silently discard bot submissions", () => {
+  const result = quoteRequestSchema.safeParse({ ...validRequest, website: "bot" });
+  assert.equal(result.success, true);
+  if (result.success) assert.equal(result.data.website, "bot");
 });

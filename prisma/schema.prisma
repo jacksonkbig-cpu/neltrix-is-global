@@ -120,6 +120,7 @@ model Ticket {
   ticketNumber String          @unique
   userId       String?
   user         User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  customerEmail String?
   status       TicketStatus    @default(OPEN)
   priority     TicketPriority  @default(NORMAL)
   subject      String

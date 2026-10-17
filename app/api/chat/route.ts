@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
         data: {
           ticketNumber: newTicketNumber(),
           subject: data.message.slice(0, 120),
-          messages: { create: [{ sender: "CUSTOMER", message: data.message, isInternalNote: false }] },
+          messages: { create: (data.messages?.length ? data.messages : [{ role: "user" as const, content: data.message }]).slice(-20).map((item) => ({ sender: item.role === "assistant" ? "AI" as const : "CUSTOMER" as const, message: item.content, isInternalNote: false })) },
         },
         select: { ticketNumber: true, status: true, createdAt: true },
       });
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
           ...data.messages.map((message) => ({ role: message.role, content: message.content })),
         ],
       }),
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(20_000),
       cache: "no-store",
     });
     if (!upstream.ok || !upstream.body) return safeError("AI support is temporarily unavailable.", 503);

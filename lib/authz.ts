@@ -1,6 +1,7 @@
 import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 export type StaffRole = "ADMIN" | "OPERATIONS_STAFF" | "CARRIER";
 export type StaffContext = { userId: string; email: string; role: StaffRole };
@@ -34,6 +35,6 @@ export async function getStaffContext(allowedRoles: StaffRole[] = ["ADMIN", "OPE
 
 export async function requireStaff(allowedRoles: StaffRole[] = ["ADMIN", "OPERATIONS_STAFF"]) {
   const staff = await getStaffContext(allowedRoles);
-  if (!staff) throw new Error("FORBIDDEN");
+  if (!staff) redirect("/login?reason=staff-access-required");
   return staff;
 }

@@ -14,11 +14,14 @@ type SchemaRow = {
   ticketTable: boolean;
   chatMessageTable: boolean;
   auditLogTable: boolean;
+  profilesTable: boolean;
+  quoteRequestsTable: boolean;
 };
 
 export async function GET() {
   let database: "ok" | "unavailable" = "ok";
   let prismaSchema: "ok" | "incomplete" | "unavailable" = "unavailable";
+  let supabaseIntakeSchema: "ok" | "incomplete" | "unavailable" = "unavailable";
 
   try {
     await db.$queryRawUnsafe("SELECT 1");
@@ -31,21 +34,33 @@ export async function GET() {
         to_regclass('public."Quote"') IS NOT NULL AS "quoteTable",
         to_regclass('public."Ticket"') IS NOT NULL AS "ticketTable",
         to_regclass('public."ChatMessage"') IS NOT NULL AS "chatMessageTable",
-        to_regclass('public."AuditLog"') IS NOT NULL AS "auditLogTable"
+        to_regclass('public."AuditLog"') IS NOT NULL AS "auditLogTable",
+        to_regclass('public.profiles') IS NOT NULL AS "profilesTable",
+        to_regclass('public.quote_requests') IS NOT NULL AS "quoteRequestsTable"
     `);
     const schema = rows[0];
-    prismaSchema = schema && Object.values(schema).every(Boolean) ? "ok" : "incomplete";
+    if (schema) {
+      prismaSchema = [
+        schema.userTable, schema.shipmentTable, schema.shipmentNoteTable,
+        schema.quoteTable, schema.ticketTable, schema.chatMessageTable, schema.auditLogTable,
+      ].every(Boolean) ? "ok" : "incomplete";
+      supabaseIntakeSchema = schema.profilesTable && schema.quoteRequestsTable ? "ok" : "incomplete";
+    }
   } catch {
-    if (database === "ok") prismaSchema = "unavailable";
-    else database = "unavailable";
+    if (database === "ok") {
+      prismaSchema = "unavailable";
+      supabaseIntakeSchema = "unavailable";
+    } else {
+      database = "unavailable";
+    }
   }
 
-  const healthy = database === "ok" && prismaSchema === "ok";
+  const healthy = database === "ok" && prismaSchema === "ok" && supabaseIntakeSchema === "ok";
   return Response.json({
     status: healthy ? "ok" : "degraded",
     service: "neltrix-web",
     uptimeSeconds: Math.max(0, Math.floor((Date.now() - processStartedAt) / 1000)),
-    checks: { database, prismaSchema },
+    checks: { database, prismaSchema, supabaseIntakeSchema },
     timestamp: new Date().toISOString(),
   }, { status: healthy ? 200 : 503, headers: { "Cache-Control": "no-store" } });
 }

@@ -32,7 +32,13 @@ async function handleTracking(trackingNumber: unknown) {
     const external = await lookupCarrier(parsed.data);
     if (external) return NextResponse.json({ tracking: external }, { headers: { "Cache-Control": "no-store" } });
     return error("No shipment was found for that tracking number.", 404);
-  } catch {
+  } catch (cause) {
+    // Log only error type/code; never log tracking numbers, credentials, or customer data.
+    const detail = cause && typeof cause === "object" ? cause as { name?: unknown; code?: unknown } : {};
+    console.error("Tracking lookup failed", {
+      name: typeof detail.name === "string" ? detail.name : "UnknownError",
+      code: typeof detail.code === "string" ? detail.code : undefined,
+    });
     return error("Tracking is temporarily unavailable. Please try again later.", 503);
   }
 }

@@ -62,7 +62,7 @@ export default function Home() {
         <span className="brand-mark">N</span><span className="brand-copy"><strong>NELTRIX</strong><small>I.S. Global</small></span>
         <span className="brand-sub">INTERNATIONAL<br/>SHIPPING</span>
       </a>
-      <nav id="primary-navigation" className={mobileMenuOpen ? "nav-links nav-open" : "nav-links"}><a href="#home" onClick={() => setMobileMenuOpen(false)}>Home</a><a href="#services" onClick={() => setMobileMenuOpen(false)}>Services</a><a href="#track" onClick={() => setMobileMenuOpen(false)}>Track Shipment</a><a href="#about" onClick={() => setMobileMenuOpen(false)}>About Us</a><a href="#quote" onClick={() => setMobileMenuOpen(false)}>Get a Quote</a></nav>
+      <nav id="primary-navigation" className={mobileMenuOpen ? "nav-links nav-open" : "nav-links"}><a href="#home" onClick={() => setMobileMenuOpen(false)}>Home</a><a href="#services" onClick={() => setMobileMenuOpen(false)}>Services</a><a href="#track" onClick={() => setMobileMenuOpen(false)}>Track Shipment</a><a href="#about" onClick={() => setMobileMenuOpen(false)}>About Us</a><a href="#quote" onClick={() => setMobileMenuOpen(false)}>Get a Quote</a><a href="/login" onClick={() => setMobileMenuOpen(false)}>Staff Dashboard</a></nav>
       <a className="nav-cta" href="#quote">Request a quote <ArrowRight size={16}/></a>
       <button className="mobile-menu" type="button" aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"} aria-expanded={mobileMenuOpen} aria-controls="primary-navigation" onClick={() => setMobileMenuOpen((open) => !open)}><Menu/></button>
     </header>
@@ -125,6 +125,6 @@ export default function Home() {
       </form>
     </section>
 
-    <footer><a className="brand footer-brand" href="#home"><span className="brand-mark">N</span><span className="brand-copy"><strong>NELTRIX</strong><small>I.S. Global</small></span></a><p>International Shipping · Freight · Logistics</p><span>© {new Date().getFullYear()} NELTRIX I.S. Global. Working brand name; legal clearance pending.</span></footer>
+    <footer><a className="brand footer-brand" href="#home"><span className="brand-mark">N</span><span className="brand-copy"><strong>NELTRIX</strong><small>I.S. Global</small></span></a><p>International Shipping · Freight · Logistics</p><span>© {new Date().getFullYear()} NELTRIX I.S. Global. Working brand name; legal clearance pending.</span><a href="/login" className="text-link">Staff dashboard login <ArrowRight size={16}/></a></footer>
   </main>;
 }

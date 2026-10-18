@@ -28,7 +28,7 @@ export default function LoginPage() {
       if (user) {
         const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
         if (profile?.role === "ops") {
-          window.location.assign("/ops");
+          window.location.assign("/admin");
           return;
         }
         const role = user.app_metadata?.role;

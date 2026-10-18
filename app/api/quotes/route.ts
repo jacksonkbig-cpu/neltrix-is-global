@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { quoteCalculatorSchema } from "@/lib/logistics/validation";
 import { quoteRequestSchema } from "@/lib/quotes/validation";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -131,25 +130,32 @@ export async function POST(request: NextRequest) {
   const ipHash = createHmac("sha256", rateLimitSecret).update(clientAddress).digest("hex");
 
   try {
-    const supabase = createSupabaseAdminClient();
-    const { data, error } = await supabase.rpc("submit_quote_request", {
-      p_full_name: parsed.data.fullName,
-      p_email: parsed.data.email,
-      p_phone: parsed.data.phone || null,
-      p_origin_country: parsed.data.originCountry,
-      p_destination_country: parsed.data.destinationCountry,
-      p_shipment_type: parsed.data.shipmentType,
-      p_details: parsed.data.details || null,
-      p_ip_hash: ipHash,
-    });
-
-    if (error?.message?.includes("RATE_LIMITED")) return jsonError("Too many requests. Please try again later.", 429);
-    if (error) {
-      console.error("Quote persistence failed:", error.code ?? "unknown");
+    // Execute the locked-down SECURITY DEFINER intake function through the
+    // server's existing Prisma connection. This keeps its database-side
+    // 5-per-15-minute limit without requiring a Supabase service-role key
+    // in Vercel. The function remains unavailable to anon/authenticated API roles.
+    const rows = await db.$queryRaw<Array<{ id: string }>>`
+      SELECT public.submit_quote_request(
+        ${parsed.data.fullName}::text,
+        ${parsed.data.email}::text,
+        ${parsed.data.phone || ""}::text,
+        ${parsed.data.originCountry}::text,
+        ${parsed.data.destinationCountry}::text,
+        ${parsed.data.shipmentType}::text,
+        ${parsed.data.details || ""}::text,
+        ${ipHash}::text
+      )::text AS id
+    `;
+    const requestId = rows[0]?.id;
+    if (!requestId) {
+      console.error("Quote persistence failed: empty function result");
       return jsonError("We could not save your request. Please try again later.", 503);
     }
-    return NextResponse.json({ ok: true, requestId: data }, { status: 201, headers: { "Cache-Control": "no-store" } });
-  } catch {
-    return jsonError("Quote requests are not configured yet. No request was saved.", 503);
+    return NextResponse.json({ ok: true, requestId }, { status: 201, headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message.includes("RATE_LIMITED")) return jsonError("Too many requests. Please try again later.", 429);
+    console.error("Quote persistence failed:", "database operation failed");
+    return jsonError("We could not save your request. Please try again later.", 503);
   }
 }

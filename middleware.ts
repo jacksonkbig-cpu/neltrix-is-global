@@ -8,6 +8,29 @@ const sensitiveLimits: Record<string, string> = {
   "/api/admin/carriers/rates": "RATE_LIMIT_ADMIN_PER_MINUTE",
 };
 
+// Best-effort per-isolate fallback keeps protected API routes available when Redis
+// is not configured. Configure shared Redis for globally consistent distributed limits.
+const localRateLimits = new Map<string, { count: number; resetAt: number }>();
+
+function applyLocalRateLimit(path: string, ip: string, limit: number): NextResponse | null {
+  const now = Date.now();
+  if (localRateLimits.size > 5000) {
+    for (const [key, entry] of localRateLimits) {
+      if (entry.resetAt <= now) localRateLimits.delete(key);
+    }
+  }
+  const key = 'neltrix:local-ratelimit:' + path + ':' + Math.floor(now / 60000) + ':' + ip;
+  const current = localRateLimits.get(key);
+  const count = current && current.resetAt > now ? current.count + 1 : 1;
+  localRateLimits.set(key, { count, resetAt: Math.floor(now / 60000) * 60000 + 60000 });
+  if (count > limit) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': String(60 - (Math.floor(now / 1000) % 60)) } },
+    );
+  }
+  return null;
+}
 const RATE_LIMIT_SCRIPT = [
   "local count = redis.call('INCR', KEYS[1])",
   "if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end",
@@ -20,19 +43,16 @@ async function applyRateLimit(request: NextRequest): Promise<NextResponse | null
   if (!envName) return null;
   const redisUrl = process.env.RATE_LIMIT_REDIS_REST_URL;
   const redisToken = process.env.RATE_LIMIT_REDIS_REST_TOKEN;
-  if (!redisUrl || !redisToken) {
-    return process.env.NODE_ENV === "production"
-      ? NextResponse.json({ error: "Service temporarily unavailable." }, { status: 503 })
-      : null;
-  }
   const ip = request.headers.get("x-real-ip");
-  if (!ip && process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Service temporarily unavailable." }, { status: 503 });
-  }
   const minute = Math.floor(Date.now() / 60_000);
   const key = `neltrix:ratelimit:${request.nextUrl.pathname}:${minute}:${ip ?? "local-dev"}`;
   const parsedLimit = Number.parseInt(process.env[envName] ?? "30", 10);
   const limit = Number.isFinite(parsedLimit) ? Math.min(10_000, Math.max(1, parsedLimit)) : 30;
+  if (!redisUrl || !redisToken || (!ip && process.env.NODE_ENV === "production")) {
+    return process.env.NODE_ENV === "production"
+      ? applyLocalRateLimit(request.nextUrl.pathname, ip ?? "unknown", limit)
+      : null;
+  }
   try {
     const endpoint = new URL(redisUrl);
     if (endpoint.protocol !== "https:") throw new Error("Rate-limit endpoint must use HTTPS");
@@ -56,7 +76,7 @@ async function applyRateLimit(request: NextRequest): Promise<NextResponse | null
     return null;
   } catch {
     return process.env.NODE_ENV === "production"
-      ? NextResponse.json({ error: "Service temporarily unavailable." }, { status: 503 })
+      ? applyLocalRateLimit(request.nextUrl.pathname, ip ?? "unknown", limit)
       : null;
   }
 }

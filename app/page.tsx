@@ -13,15 +13,37 @@ const services = [
 export default function Home() {
   const [tracking, setTracking] = useState("");
   const [trackMessage, setTrackMessage] = useState("");
+  const [trackBusy, setTrackBusy] = useState(false);
   const [quoteSent, setQuoteSent] = useState(false);
   const [quoteMessage, setQuoteMessage] = useState("");
   const [quoteBusy, setQuoteBusy] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  function trackShipment(e: React.FormEvent<HTMLFormElement>) {
+  async function trackShipment(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!tracking.trim()) { setTrackMessage("Enter a tracking number to continue."); return; }
-    setTrackMessage("Live tracking is not connected yet. No shipment lookup was performed. Connect a carrier API before using this service.");
+    const trackingNumber = tracking.trim();
+    if (!trackingNumber) { setTrackMessage("Enter a tracking number to continue."); return; }
+    setTrackBusy(true);
+    setTrackMessage("");
+    try {
+      const response = await fetch("/api/tracking?trackingNumber=" + encodeURIComponent(trackingNumber), { cache: "no-store" });
+      const result = await response.json() as { tracking?: { status?: string; carrier?: string | null; origin?: string | null; destination?: string | null; estimatedDelivery?: string | null; source?: string }; error?: string };
+      if (!response.ok || !result.tracking) {
+        setTrackMessage(response.status === 404
+          ? "No shipment was found for that tracking number. Check it and try again. External carrier tracking is not connected yet."
+          : result.error ?? "Tracking is temporarily unavailable. Please try again later.");
+        return;
+      }
+      const item = result.tracking;
+      const route = item.origin && item.destination ? ` Route: ${item.origin} → ${item.destination}.` : "";
+      const eta = item.estimatedDelivery ? ` Estimated delivery: ${new Date(item.estimatedDelivery).toLocaleDateString()}.` : "";
+      const source = item.source === "mock" ? " This is demo data, not a live carrier update." : "";
+      setTrackMessage(`Status: ${(item.status ?? "UNKNOWN").replaceAll("_", " ")}.${item.carrier ? ` Carrier: ${item.carrier}.` : ""}${route}${eta}${source}`);
+    } catch {
+      setTrackMessage("Tracking is temporarily unavailable. Please try again later.");
+    } finally {
+      setTrackBusy(false);
+    }
   }
 
   async function requestQuote(e: React.FormEvent<HTMLFormElement>) {
@@ -88,7 +110,7 @@ export default function Home() {
       <div className="track-heading"><div className="track-icon"><Package/></div><div><h2>Track your shipment</h2><p>Tracking will be available after verified carrier integration is connected.</p></div></div>
       <form className="track-form" onSubmit={trackShipment}>
         <label className="sr-only" htmlFor="tracking">Tracking number</label><input id="tracking" value={tracking} onChange={e=>{setTracking(e.target.value);setTrackMessage("");}} placeholder="Enter tracking number" />
-        <button className="button primary" type="submit">Track <ArrowRight size={17}/></button>
+        <button className="button primary" type="submit" disabled={trackBusy}>{trackBusy ? "Checking…" : "Track"} <ArrowRight size={17}/></button>
       </form>
       {trackMessage && <p className="notice" role="status">{trackMessage}</p>}
     </section>

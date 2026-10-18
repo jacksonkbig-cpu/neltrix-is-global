@@ -24,7 +24,22 @@ export default function LoginPage() {
       const supabase = createBrowserClient(url, key);
       const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (signInError) throw new Error("Email or password was not accepted.");
-      window.location.assign("/admin/shipments");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+        if (profile?.role === "ops") {
+          window.location.assign("/ops");
+          return;
+        }
+        const role = user.app_metadata?.role;
+        if (role === "ADMIN" || role === "OPERATIONS_STAFF") {
+          window.location.assign("/admin/shipments");
+          return;
+        }
+        window.location.assign("/unauthorized");
+        return;
+      }
+      throw new Error("Sign-in completed but the staff session could not be verified.");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Sign-in failed.");
     } finally {

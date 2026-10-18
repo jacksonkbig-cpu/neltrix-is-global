@@ -135,11 +135,17 @@ export async function middleware(request: NextRequest) {
     });
     const { data: { user } } = await supabase.auth.getUser();
     if (isAdminRoute) {
-      const role = typeof user?.app_metadata?.role === "string" ? user.app_metadata.role : "";
       if (!user) {
         const signInUrl = new URL("/login", request.url);
         signInUrl.searchParams.set("next", request.nextUrl.pathname);
         return NextResponse.redirect(signInUrl);
+      }
+      let role = typeof user.app_metadata?.role === "string" ? user.app_metadata.role : "";
+      if (!["ADMIN", "OPERATIONS_STAFF"].includes(role)) {
+        // The existing trusted profiles.role assignment is also accepted so the
+        // invited operations owner can use the full dashboard without a second role system.
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+        if (profile?.role === "ops") role = "OPERATIONS_STAFF";
       }
       if (!["ADMIN", "OPERATIONS_STAFF"].includes(role)) {
         return NextResponse.redirect(new URL("/unauthorized", request.url));

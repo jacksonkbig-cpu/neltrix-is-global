@@ -21,9 +21,9 @@ export async function GET() {
   let prismaSchema: "ok" | "incomplete" | "unavailable" = "unavailable";
 
   try {
-    await db.$queryRaw\`SELECT 1\`;
+    await db.$queryRawUnsafe("SELECT 1");
     database = "ok";
-    const rows = await db.$queryRaw<SchemaRow[]>\`
+    const rows = await db.$queryRawUnsafe<SchemaRow[]>(`
       SELECT
         to_regclass('public."User"') IS NOT NULL AS "userTable",
         to_regclass('public."Shipment"') IS NOT NULL AS "shipmentTable",
@@ -32,7 +32,7 @@ export async function GET() {
         to_regclass('public."Ticket"') IS NOT NULL AS "ticketTable",
         to_regclass('public."ChatMessage"') IS NOT NULL AS "chatMessageTable",
         to_regclass('public."AuditLog"') IS NOT NULL AS "auditLogTable"
-    \`;
+    `);
     const schema = rows[0];
     prismaSchema = schema && Object.values(schema).every(Boolean) ? "ok" : "incomplete";
   } catch {

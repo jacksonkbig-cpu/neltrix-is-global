@@ -27,8 +27,13 @@ export async function getStaffContext(allowedRoles: StaffRole[] = ["ADMIN", "OPE
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) return null;
 
-  // Roles must be assigned by trusted server-side admin tooling in app_metadata.
-  const role = user.app_metadata?.role;
+  // Prefer server-controlled app_metadata. Also accept the existing protected
+  // profiles.role='ops' assignment so operations staff do not need a second login.
+  let role: unknown = user.app_metadata?.role;
+  if (typeof role !== "string" || !allowedRoles.includes(role as StaffRole)) {
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    if (profile?.role === "ops") role = "OPERATIONS_STAFF";
+  }
   if (typeof role !== "string" || !allowedRoles.includes(role as StaffRole)) return null;
   return { userId: user.id, email: user.email ?? "", role: role as StaffRole };
 }

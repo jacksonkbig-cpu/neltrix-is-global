@@ -1,71 +1,65 @@
-# NELTRIX I.S. Global — website starter
+# NELTRIX I.S. Global
 
-A Next.js foundation for NELTRIX I.S. Global. The quote intake and staff quote-review workflow require a separately configured Supabase project and applied migration. It is **not yet a live shipping platform**: carrier tracking, rate calculations, booking, crypto payments, and production deployment remain unimplemented.
+A Next.js 15 / React 19 / TypeScript web application for NELTRIX I.S. Global. The production site is deployed on Vercel and connected to a Supabase-hosted PostgreSQL database.
 
-## Requirements
-- Node.js 20.9+ (recommended)
-- npm
+## Production
 
-## Run locally
+- Website: https://neltrix-is-global.vercel.app
+- Health check: https://neltrix-is-global.vercel.app/api/health
+- Staff quote review: https://neltrix-is-global.vercel.app/ops/login
+- Admin operations: https://neltrix-is-global.vercel.app/login
+
+The health endpoint checks database connectivity and required schema presence. It does not certify that all customer-facing or staff workflows have passed end-to-end tests.
+
+## Implemented foundations
+
+- Responsive public website and quote-request form.
+- Server-side validation for quote requests and indicative shipment estimates.
+- Supabase quote-intake tables, row-level security, staff profiles and a rate-limited database function.
+- Server-side Prisma schema for shipment records, indicative calculator quotes, support tickets/messages and audit events.
+- Tracking lookup endpoint; a nonexistent test tracking number correctly returns not found.
+- Staff-only shipment management and customer support inbox routes.
+- Security headers and a health endpoint.
+- GitHub Actions checks for lint, TypeScript, unit tests and production build.
+
+## Current operational limits
+
+This is not yet a complete, launch-ready shipping platform.
+
+- **Quote intake:** the production endpoint now calls the locked-down database intake function through the server's Prisma connection, avoiding a dependency on a Supabase service-role API key. A successful real submission still needs an end-to-end synthetic test.
+- **Staff access:** no Supabase Auth users were present during the latest check. Staff invitation and role assignment must be completed before the workspaces can be used.
+- **Separate role systems:** quote review uses `public.profiles.role = 'ops'`; the shipment/support/admin workspace checks trusted Supabase `app_metadata.role` values. These are separate permissions and must be assigned deliberately.
+- **Customer support notifications:** the inbox can persist replies and internal notes, but email delivery is not verified/configured. Do not assume a saved reply has been emailed to a customer.
+- **AI chat:** without `OPENAI_API_KEY`, the assistant returns a transparent fallback and directs customers to human support.
+- **Rate limiting:** the current fallback is per serverless isolate. A shared Redis-compatible store is recommended for consistent distributed limits.
+- **Shipping integrations:** live carrier tracking, carrier-confirmed pricing, bookings, labels, pickup dispatch and customer self-service are not yet production-verified.
+- **Payments:** payment processing and crypto payments are not enabled.
+
+## Local development
+
+Requirements: Node.js 20.9+ and npm.
+
 ```bash
 npm install
 cp .env.example .env.local
 npm run dev
 ```
-Open http://localhost:3000.
 
-## Production build check
+Run checks before release:
+
 ```bash
 npm run lint
 npm run typecheck
+npm test
 npm run build
-npm start
 ```
 
-## Current status
-Implemented:
-- Responsive landing page and services overview
-- Accessible mobile navigation menu
-- Baseline security headers and a simple application health endpoint
-- Tracking-number form with explicit “integration not connected” result
-- Server-side quote request validation and a Supabase RPC persistence path (requires environment setup)
-- Supabase-authenticated staff sign-in and an operations-only quote review page
-- Database migration with row-level security and basic request rate limiting
-- Unit tests for quote request validation
-- Domain/production setup documentation
+See [Supabase setup and operational controls](docs/SUPABASE-SETUP.md) for the schema, environment variables, staff roles and launch checklist.
 
-Not implemented / not live:
-- No public account registration; staff authentication requires configured Supabase Auth and manually assigned ops roles
-- No real-time shipment tracking or carrier connection
-- No shipment creation, rates, labels, pickup dispatch, driver app, or operations console
-- No crypto payments or wallet monitoring
-- No production Supabase project configured in this repository; quote intake returns unavailable until setup is complete
-- No email/SMS notifications or customer self-service accounts
-- No production deployment or domain registration
+## Security rules
 
-## Supabase quote-intake setup
-Follow [`docs/SUPABASE-SETUP.md`](docs/SUPABASE-SETUP.md) to configure a Supabase project, apply the migration, set server-only environment variables, and assign staff access. Do not submit real customer data until the checklist is complete.
-
-## Recommended next milestones
-1. Confirm company legal name, launch locations, domain, and legal operating model.
-2. Select hosting (e.g. Vercel or a cloud platform), database (managed PostgreSQL), and authentication provider.
-3. Create carrier accounts and obtain production API access for the selected countries/services.
-4. Select a crypto payment processor after legal/compliance review; use provider-hosted checkout and signed webhooks. Never collect wallet seed phrases or private keys in this app.
-5. Implement shipment, quote, tracking-event, payment, webhook, user, and audit data models.
-6. Add integration tests, security review, backups, monitoring, and pilot acceptance tests.
-7. Deploy only after verified carrier coverage, pricing, payment reconciliation, and operational procedures are ready.
-
-## Domain checklist
-Potential naming candidates to check (availability is unknown):
-- neltrixglobal.com
-- neltrixisglobal.com
-- neltrixshipping.com
-- shipneltrix.com
-
-Check registrar availability, trademarks, corporate registries, and matching social handles before buying or printing branding. These suggestions are not confirmed available.
-
-## Security notes
-- Do not put provider API keys in `NEXT_PUBLIC_*` variables.
-- Verify payment webhooks server-side, check signatures, enforce idempotency, and reconcile payments.
-- Do not represent mock data as live tracking.
-- Apply role-based access control and tenant boundaries before customer/admin features are added.
+- Never commit secrets or share them in chat.
+- Never put service-role, database, carrier, email or AI keys in `NEXT_PUBLIC_*` variables.
+- Do not grant public execution of the quote-intake `SECURITY DEFINER` function.
+- Keep operational tables inaccessible to browser roles; access them through authenticated, server-side routes.
+- Use synthetic records for tests and do not represent test data as real shipments or customer enquiries.

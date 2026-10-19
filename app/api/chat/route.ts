@@ -25,6 +25,35 @@ function newTicketNumber() {
   return `NLX-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString("hex").toUpperCase()}`;
 }
 
+function localFaqAnswer(message: string): string {
+  const text = message.toLowerCase();
+  if (/track|tracking|shipment status|where is my/.test(text)) {
+    return "To check a shipment, enter the tracking number in the Track Shipment section. NELTRIX can currently show records stored in its own shipment database. Live carrier scans are not available until a carrier integration is configured. I will not invent a shipment status.";
+  }
+  if (/quote|price|cost|rate|how much|estimate/.test(text)) {
+    return "You can submit the Get a Quote form with your origin, destination, shipment type, and details. A request is not a confirmed booking or carrier rate. The website's calculator, where available, is an indicative estimate only and must be checked against a contracted carrier rate.";
+  }
+  if (/support|human|agent|person|contact|ticket/.test(text)) {
+    return "You can request human support from this chat. The system creates a support ticket in the staff inbox when the database service is available. Email notifications and customer email delivery are not configured yet, so keep your ticket reference and check back with the support team.";
+  }
+  if (/air freight|air cargo|plane/.test(text)) {
+    return "NELTRIX lists air freight for time-sensitive international consignments. Availability, transit time, customs requirements, and final pricing must be confirmed for your specific route and shipment before booking.";
+  }
+  if (/ocean|sea freight|container|ship freight/.test(text)) {
+    return "NELTRIX lists ocean freight for larger and commercial consignments. Container availability, sailing schedule, customs requirements, and final pricing require route-specific confirmation before booking.";
+  }
+  if (/road|land transport|truck|ground/.test(text)) {
+    return "NELTRIX lists land transport through its team and local partners. Coverage, timing, and final pricing depend on the origin, destination, and shipment details and must be confirmed before booking.";
+  }
+  if (/customs|duty|tax|import|export|restricted|prohibited/.test(text)) {
+    return "Customs duties, documents, and import restrictions depend on the countries, commodity, value, and shipment purpose. Please verify requirements with the official customs authority for the destination and do not treat this general assistant as legal or customs clearance advice.";
+  }
+  if (/service|services|what do you ship|what can you ship/.test(text)) {
+    return "NELTRIX lists express delivery, air freight, ocean freight, and land transport. Please submit a quote request with your route and shipment details so the operations team can assess availability. A submitted request is not a confirmed booking.";
+  }
+  return "I can help with general information about NELTRIX's listed shipping services, quote requests, internal tracking, and support tickets. Tell me which service or route you need. Live carrier tracking, confirmed rates, and email notifications are not configured yet. You can request human support if you need a person to review your case.";
+}
+
 export async function POST(request: NextRequest) {
   if (!(request.headers.get("content-type") ?? "").toLowerCase().includes("application/json")) return safeError("Send JSON.", 415);
   if (Number(request.headers.get("content-length") ?? "0") > 100_000) return safeError("Request is too large.", 413);
@@ -109,10 +138,14 @@ export async function POST(request: NextRequest) {
 
   if (!data.messages?.length) return safeError("A chat message is required.", 400);
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return NextResponse.json({
-    message: "I can help with general shipping questions. For current shipment details or account-specific help, choose “Request Human Support.” The AI assistant is not configured for live answers yet.",
-    configured: false,
-  }, { headers: { "Cache-Control": "no-store" } });
+  if (!apiKey) {
+    const latestUserMessage = [...(data.messages ?? [])].reverse().find((message) => message.role === "user")?.content ?? "";
+    return NextResponse.json({
+      message: localFaqAnswer(latestUserMessage),
+      configured: false,
+      mode: "local-faq",
+    }, { headers: { "Cache-Control": "no-store" } });
+  }
 
   let trackingContext = "No tracking number was provided.";
   if (data.trackingNumber) {

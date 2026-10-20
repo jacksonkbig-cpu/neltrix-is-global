@@ -3,6 +3,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 
+// Keep the recovery screen available as a real App Router page in production.
+export const dynamic = "force-dynamic";
+
 export default function ResetPasswordPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

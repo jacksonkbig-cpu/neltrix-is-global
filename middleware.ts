@@ -81,8 +81,8 @@ async function applyRateLimit(request: NextRequest): Promise<NextResponse | null
   }
 }
 
-function setSecurityHeaders(response: NextResponse, nonce: string) {
-  response.headers.set("Content-Security-Policy", [
+function buildContentSecurityPolicy(nonce: string): string {
+  return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
     "style-src 'self' 'unsafe-inline'",
@@ -94,7 +94,11 @@ function setSecurityHeaders(response: NextResponse, nonce: string) {
     "form-action 'self'",
     "frame-ancestors 'none'",
     "upgrade-insecure-requests",
-  ].join("; "));
+  ].join("; ");
+}
+
+function setSecurityHeaders(response: NextResponse, nonce: string) {
+  response.headers.set("Content-Security-Policy", buildContentSecurityPolicy(nonce));
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -117,6 +121,12 @@ export async function middleware(request: NextRequest) {
   const nonce = btoa(crypto.randomUUID());
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
+
+  // Next.js reads the request CSP during rendering to attach this nonce to its
+  // framework and inline scripts. Setting CSP only on the response can block
+  // those scripts, leaving client-side controls (links, forms, and buttons)
+  // inert even though the page HTML itself renders.
+  requestHeaders.set("Content-Security-Policy", buildContentSecurityPolicy(nonce));
   let response = NextResponse.next({ request: { headers: requestHeaders } });
 
   const isAdminRoute = request.nextUrl.pathname === "/admin" || request.nextUrl.pathname.startsWith("/admin/");

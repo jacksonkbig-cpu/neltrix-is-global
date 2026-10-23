@@ -8,8 +8,11 @@ const processStartedAt = Date.now();
 type Check = "connected" | "incomplete" | "unavailable";
 
 async function tableExists(table: string): Promise<boolean> {
+  const relation = ["User", "Shipment", "ShipmentNote", "Quote", "Ticket", "ChatMessage", "AuditLog"].includes(table)
+    ? `public."${table}"`
+    : `public.${table}`;
   const rows = await db.$queryRaw<Array<{ exists: boolean }>>`
-    SELECT to_regclass(${"public." + table}) IS NOT NULL AS exists
+    SELECT to_regclass(${relation}) IS NOT NULL AS exists
   `;
   return rows[0]?.exists === true;
 }

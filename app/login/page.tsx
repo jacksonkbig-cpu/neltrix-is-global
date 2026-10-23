@@ -44,9 +44,7 @@ export default function LoginPage() {
       const supabase = client();
       const redirectTo = new URL("/auth/callback?next=/dashboard", window.location.origin).toString();
       const { error: oauthError } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo } });
-      if (oauthError) throw new Error(provider === "google"
-        ? "Google sign-in is unavailable. The administrator must enable the Google provider in Supabase."
-        : "Apple sign-in is unavailable. The administrator must enable the Apple provider in Supabase.");
+      if (oauthError) throw new Error("Apple sign-in is unavailable. The administrator must enable the Apple provider in Supabase.");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not start sign-in.");
       setBusy(false);

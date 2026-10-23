@@ -3,59 +3,74 @@ import { db } from "@/lib/db";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Module-scoped process start time; serverless instances each report their own uptime.
 const processStartedAt = Date.now();
 
-type SchemaRow = {
-  userTable: boolean;
-  shipmentTable: boolean;
-  shipmentNoteTable: boolean;
-  quoteTable: boolean;
-  ticketTable: boolean;
-  chatMessageTable: boolean;
-  auditLogTable: boolean;
-  profilesTable: boolean;
-  quoteRequestsTable: boolean;
-};
+type Check = "connected" | "incomplete" | "unavailable";
+
+async function tableExists(table: string): Promise<boolean> {
+  const relation = ["User", "Shipment", "ShipmentNote", "Quote", "Ticket", "ChatMessage", "AuditLog"].includes(table)
+    ? `public."${table}"`
+    : `public.${table}`;
+  const rows = await db.$queryRaw<Array<{ exists: boolean }>>`
+    SELECT to_regclass(${relation}) IS NOT NULL AS exists
+  `;
+  return rows[0]?.exists === true;
+}
+
+async function safeCheck(check: () => Promise<boolean>): Promise<Check> {
+  try {
+    return (await check()) ? "connected" : "incomplete";
+  } catch {
+    return "unavailable";
+  }
+}
 
 export async function GET() {
-  let database: "ok" | "unavailable" = "ok";
-  let prismaSchema: "ok" | "incomplete" | "unavailable" = "unavailable";
-  let supabaseIntakeSchema: "ok" | "incomplete" | "unavailable" = "unavailable";
+  let database: Check = "unavailable";
+  let prismaSchema: Check = "unavailable";
+  let supabaseIntakeSchema: Check = "unavailable";
 
   try {
-    await db.$queryRawUnsafe("SELECT 1");
-    database = "ok";
-    const rows = await db.$queryRawUnsafe<SchemaRow[]>(`
-      SELECT
-        to_regclass('public."User"') IS NOT NULL AS "userTable",
-        to_regclass('public."Shipment"') IS NOT NULL AS "shipmentTable",
-        to_regclass('public."ShipmentNote"') IS NOT NULL AS "shipmentNoteTable",
-        to_regclass('public."Quote"') IS NOT NULL AS "quoteTable",
-        to_regclass('public."Ticket"') IS NOT NULL AS "ticketTable",
-        to_regclass('public."ChatMessage"') IS NOT NULL AS "chatMessageTable",
-        to_regclass('public."AuditLog"') IS NOT NULL AS "auditLogTable",
-        to_regclass('public.profiles') IS NOT NULL AS "profilesTable",
-        to_regclass('public.quote_requests') IS NOT NULL AS "quoteRequestsTable"
-    `);
-    const schema = rows[0];
-    if (schema) {
-      prismaSchema = [
-        schema.userTable, schema.shipmentTable, schema.shipmentNoteTable,
-        schema.quoteTable, schema.ticketTable, schema.chatMessageTable, schema.auditLogTable,
-      ].every(Boolean) ? "ok" : "incomplete";
-      supabaseIntakeSchema = schema.profilesTable && schema.quoteRequestsTable ? "ok" : "incomplete";
-    }
+    await db.$queryRaw`SELECT 1`;
+    database = "connected";
   } catch {
-    if (database === "ok") {
-      prismaSchema = "unavailable";
-      supabaseIntakeSchema = "unavailable";
-    } else {
-      database = "unavailable";
-    }
+    return Response.json({
+      status: "degraded",
+      service: "neltrix-web",
+      uptimeSeconds: Math.max(0, Math.floor((Date.now() - processStartedAt) / 1000)),
+      checks: { database, prismaSchema, supabaseIntakeSchema },
+      timestamp: new Date().toISOString(),
+    }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
 
-  const healthy = database === "ok" && prismaSchema === "ok" && supabaseIntakeSchema === "ok";
+  const prismaTables = [
+    "User", "Shipment", "ShipmentNote", "Quote", "Ticket", "ChatMessage", "AuditLog",
+  ];
+  const prismaResults = await Promise.all(prismaTables.map((table) => safeCheck(() => tableExists(table))));
+  prismaSchema = prismaResults.every((result) => result === "connected")
+    ? "connected"
+    : prismaResults.some((result) => result === "unavailable") ? "unavailable" : "incomplete";
+
+  const intakeResults = await Promise.all([
+    safeCheck(() => tableExists("profiles")),
+    safeCheck(() => tableExists("quote_requests")),
+    safeCheck(async () => {
+      const rows = await db.$queryRaw<Array<{ exists: boolean }>>`
+        SELECT to_regprocedure(
+          'public.submit_quote_request(text,text,text,text,text,text,text,text)'
+        ) IS NOT NULL AS exists
+      `;
+      return rows[0]?.exists === true;
+    }),
+  ]);
+  supabaseIntakeSchema = intakeResults.every((result) => result === "connected")
+    ? "connected"
+    : intakeResults.some((result) => result === "unavailable") ? "unavailable" : "incomplete";
+
+  const healthy = database === "connected" &&
+    prismaSchema === "connected" &&
+    supabaseIntakeSchema === "connected";
+
   return Response.json({
     status: healthy ? "ok" : "degraded",
     service: "neltrix-web",

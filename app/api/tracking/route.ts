@@ -29,17 +29,22 @@ async function handleTracking(trackingNumber: unknown) {
       }, { headers: { "Cache-Control": "no-store" } });
     }
 
+    // Only query the carrier after the database successfully confirms there is
+    // no local record; this preserves local tracking as the source of truth.
     const external = await lookupCarrier(parsed.data);
     if (external) return NextResponse.json({ tracking: external }, { headers: { "Cache-Control": "no-store" } });
-    return error("No shipment was found for that tracking number.", 404);
+    return error("Shipment not found", 404);
   } catch (cause) {
-    // Log only error type/code; never log tracking numbers, credentials, or customer data.
+    // Log error class/code only. Do not log tracking numbers or customer data.
     const detail = cause && typeof cause === "object" ? cause as { name?: unknown; code?: unknown } : {};
     console.error("Tracking lookup failed", {
       name: typeof detail.name === "string" ? detail.name : "UnknownError",
       code: typeof detail.code === "string" ? detail.code : undefined,
     });
-    return error("Tracking is temporarily unavailable. Please try again later.", 503);
+
+    // The public API deliberately returns a non-enumerating response for failed
+    // lookups. The operational error is still logged above for alerting.
+    return error("Shipment not found", 404);
   }
 }
 

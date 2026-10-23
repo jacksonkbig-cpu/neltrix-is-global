@@ -53,6 +53,8 @@ async function calculateQuote(body: unknown) {
   const rate = Math.round((baseRate + chargeableWeightKg * perKgRate) * 100) / 100;
 
   try {
+    // Persist the quote before acknowledging success. If this write fails, return
+    // a non-success status rather than displaying an estimate as a saved quote.
     const quote = await db.quote.create({
       data: {
         senderZip: data.senderZip,
@@ -78,7 +80,12 @@ async function calculateQuote(body: unknown) {
         note: "Indicative estimate, not a carrier-confirmed or binding rate.",
       },
     }, { status: 201, headers: { "Cache-Control": "no-store" } });
-  } catch {
+  } catch (cause) {
+    const detail = cause && typeof cause === "object" ? cause as { name?: unknown; code?: unknown } : {};
+    console.error("Quote record persistence failed", {
+      name: typeof detail.name === "string" ? detail.name : "UnknownError",
+      code: typeof detail.code === "string" ? detail.code : undefined,
+    });
     return jsonError("We could not save the quote. Please try again later.", 503);
   }
 }
@@ -152,10 +159,14 @@ export async function POST(request: NextRequest) {
       return jsonError("We could not save your request. Please try again later.", 503);
     }
     return NextResponse.json({ ok: true, requestId }, { status: 201, headers: { "Cache-Control": "no-store" } });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "";
+  } catch (cause) {
+    const detail = cause && typeof cause === "object" ? cause as { name?: unknown; code?: unknown } : {};
+    const message = cause instanceof Error ? cause.message : "";
     if (message.includes("RATE_LIMITED")) return jsonError("Too many requests. Please try again later.", 429);
-    console.error("Quote persistence failed:", "database operation failed");
+    console.error("Quote intake persistence failed", {
+      name: typeof detail.name === "string" ? detail.name : "UnknownError",
+      code: typeof detail.code === "string" ? detail.code : undefined,
+    });
     return jsonError("We could not save your request. Please try again later.", 503);
   }
 }

@@ -5,8 +5,8 @@ import { requireStaff } from "@/lib/authz";
 export const dynamic = "force-dynamic";
 
 async function redisStatus() {
-  const url = process.env.RATE_LIMIT_REDIS_REST_URL;
-  const token = process.env.RATE_LIMIT_REDIS_REST_TOKEN;
+  const url = process.env.RATE_LIMIT_REDIS_REST_URL ?? process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.RATE_LIMIT_REDIS_REST_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) return "not configured";
   try {
     const endpoint = new URL(url);

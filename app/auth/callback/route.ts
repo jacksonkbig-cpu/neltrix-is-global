@@ -6,6 +6,12 @@ function safeNextPath(value: string | null): string {
   return value;
 }
 
+function callbackFailurePath(next: string): string {
+  return next === "/dashboard" || next.startsWith("/dashboard/")
+    ? "/dashboard/sign-in?error=auth_callback_failed"
+    : "/login?error=auth_callback_failed";
+}
+
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
@@ -15,7 +21,7 @@ export async function GET(request: NextRequest) {
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!code || !supabaseUrl || !anonKey) {
-    return NextResponse.redirect(new URL("/login?error=auth_callback_failed", url.origin));
+    return NextResponse.redirect(new URL(callbackFailurePath(next), url.origin));
   }
 
   const supabase = createServerClient(supabaseUrl, anonKey, {
@@ -29,7 +35,7 @@ export async function GET(request: NextRequest) {
 
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
-    return NextResponse.redirect(new URL("/login?error=auth_callback_failed", url.origin));
+    return NextResponse.redirect(new URL(callbackFailurePath(next), url.origin));
   }
 
   return response;

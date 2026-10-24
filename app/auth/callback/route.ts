@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!code || !supabaseUrl || !anonKey) {
-    return NextResponse.redirect(new URL("/login?error=auth_callback_failed", url.origin));
+    return NextResponse.redirect(new URL(callbackFailurePath(next), url.origin));
   }
 
   const supabase = createServerClient(supabaseUrl, anonKey, {

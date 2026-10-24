@@ -41,8 +41,8 @@ async function applyRateLimit(request: NextRequest): Promise<NextResponse | null
   const path = request.nextUrl.pathname;
   const envName = sensitiveLimits[path] ?? (path.startsWith("/api/admin/shipments/") ? "RATE_LIMIT_ADMIN_PER_MINUTE" : undefined);
   if (!envName) return null;
-  const redisUrl = process.env.RATE_LIMIT_REDIS_REST_URL;
-  const redisToken = process.env.RATE_LIMIT_REDIS_REST_TOKEN;
+  const redisUrl = process.env.RATE_LIMIT_REDIS_REST_URL ?? process.env.UPSTASH_REDIS_REST_URL;
+  const redisToken = process.env.RATE_LIMIT_REDIS_REST_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
   const ip = request.headers.get("x-real-ip");
   const minute = Math.floor(Date.now() / 60_000);
   const key = `neltrix:ratelimit:${request.nextUrl.pathname}:${minute}:${ip ?? "local-dev"}`;

@@ -2,22 +2,14 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
 
-function safeNextPath(value: string | null): string {
-  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return "/dashboard";
-  return value;
-}
-
 export default function CustomerSignInPage() {
-  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const next = safeNextPath(searchParams.get("next"));
 
   function client() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -36,7 +28,7 @@ export default function CustomerSignInPage() {
       if (authError) throw new Error("Email or password was not accepted.");
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) throw new Error("Your sign-in could not be verified. Please try again.");
-      window.location.assign(next);
+      window.location.assign("/dashboard");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Sign-in failed. Please try again.");
       setBusy(false);
@@ -49,7 +41,7 @@ export default function CustomerSignInPage() {
         <Link href="/" className="text-sm font-extrabold uppercase tracking-wide text-blue-700">NELTRIX I.S. Global</Link>
         <h1 className="mt-4 text-2xl font-bold">Your customer account</h1>
         <p className="mt-2 text-sm leading-6 text-slate-600">Sign in to view shipments assigned to your account and check their latest recorded status.</p>
-        <div className="mt-6"><GoogleSignInButton redirectTo={next} /></div>
+        <div className="mt-6"><GoogleSignInButton redirectTo="/dashboard" /></div>
         <div className="relative my-5"><div className="absolute inset-0 flex items-center"><span className="w-full border-t border-slate-200" /></div><div className="relative flex justify-center"><span className="bg-white px-3 text-sm text-slate-500">or use email</span></div></div>
         <form onSubmit={signIn} className="space-y-4">
           <label className="block text-sm font-medium">Email address<input type="email" autoComplete="username" required maxLength={254} value={email} onChange={(event) => setEmail(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 p-3 outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-100" /></label>

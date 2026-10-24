@@ -1,6 +1,6 @@
  "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, Globe2, ShieldCheck, Clock3, Headphones, Package, Plane, Ship, Truck, MapPin, Menu } from "lucide-react";
 
 const services = [
@@ -18,6 +18,14 @@ export default function Home() {
   const [quoteMessage, setQuoteMessage] = useState("");
   const [quoteBusy, setQuoteBusy] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const requestedTracking = new URLSearchParams(window.location.search).get("tracking");
+    if (requestedTracking) {
+      setTracking(requestedTracking);
+      document.getElementById("track")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, []);
 
   async function trackShipment(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -84,7 +92,7 @@ export default function Home() {
         <span className="brand-mark">N</span><span className="brand-copy"><strong>NELTRIX</strong><small>I.S. Global</small></span>
         <span className="brand-sub">INTERNATIONAL<br/>SHIPPING</span>
       </a>
-      <nav id="primary-navigation" className={mobileMenuOpen ? "nav-links nav-open" : "nav-links"}><a href="#home" onClick={() => setMobileMenuOpen(false)}>Home</a><a href="#services" onClick={() => setMobileMenuOpen(false)}>Services</a><a href="#track" onClick={() => setMobileMenuOpen(false)}>Track Shipment</a><a href="#about" onClick={() => setMobileMenuOpen(false)}>About Us</a><a href="#quote" onClick={() => setMobileMenuOpen(false)}>Get a Quote</a></nav>
+      <nav id="primary-navigation" className={mobileMenuOpen ? "nav-links nav-open" : "nav-links"}><a href="#home" onClick={() => setMobileMenuOpen(false)}>Home</a><a href="#services" onClick={() => setMobileMenuOpen(false)}>Services</a><a href="#track" onClick={() => setMobileMenuOpen(false)}>Track Shipment</a><a href="#about" onClick={() => setMobileMenuOpen(false)}>About Us</a><a href="#quote" onClick={() => setMobileMenuOpen(false)}>Get a Quote</a><a href="/dashboard" onClick={() => setMobileMenuOpen(false)}>My Account</a><a href="/login" onClick={() => setMobileMenuOpen(false)}>Staff Login</a></nav>
       <a className="nav-cta" href="#quote" onClick={(event) => { event.preventDefault(); document.getElementById("quote")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>Request a quote <ArrowRight size={16}/></a>
       <button className="mobile-menu" type="button" aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"} aria-expanded={mobileMenuOpen} aria-controls="primary-navigation" onClick={() => setMobileMenuOpen((open) => !open)}><Menu/></button>
     </header>

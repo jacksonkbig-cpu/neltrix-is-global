@@ -38,7 +38,7 @@ export default function Home() {
       const result = await response.json() as { tracking?: { status?: string; carrier?: string | null; origin?: string | null; destination?: string | null; estimatedDelivery?: string | null; source?: string }; error?: string };
       if (!response.ok || !result.tracking) {
         setTrackMessage(response.status === 404
-          ? "No shipment was found for that tracking number. Check it and try again. External carrier tracking is not connected yet."
+          ? "No shipment was found for that tracking number. Check the number and try again, or contact support if you expected a carrier update."
           : result.error ?? "Tracking is temporarily unavailable. Please try again later.");
         return;
       }

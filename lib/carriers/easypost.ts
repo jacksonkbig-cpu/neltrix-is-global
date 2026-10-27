@@ -6,28 +6,43 @@ const eventSchema = z.object({
   status: z.string().optional(),
   message: z.string().optional(),
   datetime: z.string().datetime({ offset: true }).nullable().optional(),
-  tracking_location: z.object({ city: z.string().nullable().optional(), state: z.string().nullable().optional(), country: z.string().nullable().optional() }).nullable().optional(),
+  tracking_location: z.object({
+    city: z.string().nullable().optional(),
+    state: z.string().nullable().optional(),
+    country: z.string().nullable().optional(),
+  }).nullable().optional(),
 });
-const addressSchema = z.object({ city: z.string().optional(), state: z.string().optional(), country: z.string().optional() });
+const addressSchema = z.object({
+  city: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
+  country: z.string().nullable().optional(),
+}).nullable();
 const trackerSchema = z.object({
-  tracking_code: z.string(),
-  carrier: z.string().optional(),
-  status: z.string().optional(),
+  tracking_code: z.string().trim().min(1).max(128),
+  carrier: z.string().trim().min(1).nullable().optional(),
+  status: z.string().trim().min(1).optional(),
   est_delivery_date: z.string().datetime({ offset: true }).nullable().optional(),
-  tracking_details: z.array(eventSchema).optional(),
+  tracking_details: z.array(eventSchema).max(500).optional(),
   from_address: addressSchema.optional(),
   to_address: addressSchema.optional(),
 });
 
-function status(value?: string): CarrierTracking["status"] {
+export function normalizeEasyPostStatus(value?: string): CarrierTracking["status"] {
   switch (value?.toLowerCase()) {
-    case "pre_transit": case "unknown": return "PENDING";
-    case "in_transit": case "out_for_delivery": return "IN_TRANSIT";
+    case "pre_transit": return "PENDING";
+    case "in_transit":
+    case "out_for_delivery":
+    case "available_for_pickup": return "IN_TRANSIT";
     case "delivered": return "DELIVERED";
-    case "failure": case "return_to_sender": case "cancelled": return "EXCEPTION";
+    case "failure":
+    case "error":
+    case "return_to_sender":
+    case "cancelled": return "EXCEPTION";
+    case "unknown": return "UNKNOWN";
     default: return "UNKNOWN";
   }
 }
+
 function address(value?: { city?: string | null; state?: string | null; country?: string | null } | null) {
   if (!value) return null;
   return [value.city, value.state, value.country].filter(Boolean).join(", ") || null;
@@ -36,6 +51,7 @@ function address(value?: { city?: string | null; state?: string | null; country?
 export class EasyPostCarrier implements CarrierProvider {
   private readonly key: string;
   private readonly base = "https://api.easypost.com/v2";
+
   constructor() {
     const key = process.env.EASYPOST_API_KEY;
     if (!key) throw new Error("EasyPost is not configured");
@@ -54,26 +70,41 @@ export class EasyPostCarrier implements CarrierProvider {
       cache: "no-store",
       signal: AbortSignal.timeout(5000),
     });
-    if (!response.ok) throw new Error(`Carrier provider returned HTTP ${response.status}`);
-    return await response.json() as T;
+    if (!response.ok) {
+      // Keep provider response bodies and credentials out of logs and public errors.
+      throw new Error(`EasyPost request failed with HTTP ${response.status}`);
+    }
+    try {
+      return await response.json() as T;
+    } catch {
+      throw new Error("EasyPost returned invalid JSON");
+    }
   }
 
   async getTracking(trackingNumber: string, carrier?: string): Promise<CarrierTracking | null> {
     const codeSchema = z.string().trim().min(5).max(64).regex(/^[A-Za-z0-9-]+$/);
     const code = codeSchema.safeParse(trackingNumber);
     if (!code.success) return null;
+
     const response = await this.request<unknown>("/trackers", {
       method: "POST",
       body: JSON.stringify({ tracker: { tracking_code: code.data, ...(carrier ? { carrier } : {}) } }),
     });
-    const raw = z.object({ tracker: trackerSchema }).safeParse(response);
-    if (!raw.success) throw new Error("Carrier provider returned an invalid tracking response");
-    const item = raw.data.tracker;
-    if (item.tracking_code.toUpperCase() !== code.data.toUpperCase()) throw new Error("Carrier returned a mismatched tracking number");
+
+    // EasyPost's POST /trackers response is the Tracker object itself, not
+    // { tracker: Tracker }. Accept the documented shape; the wrapper shape is
+    // intentionally rejected so malformed responses cannot be mistaken for data.
+    const raw = trackerSchema.safeParse(response);
+    if (!raw.success) throw new Error("EasyPost returned an invalid tracking response");
+    const item = raw.data;
+    if (item.tracking_code.toUpperCase() !== code.data.toUpperCase()) {
+      throw new Error("EasyPost returned a mismatched tracking number");
+    }
+
     return {
       trackingNumber: item.tracking_code,
       carrier: item.carrier ?? carrier ?? "EasyPost",
-      status: status(item.status),
+      status: normalizeEasyPostStatus(item.status),
       origin: address(item.from_address),
       destination: address(item.to_address),
       estimatedDelivery: item.est_delivery_date ? new Date(item.est_delivery_date).toISOString() : null,

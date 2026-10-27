@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "prisma generate && tsc --noEmit",
-    "test": "tsx --test tests/quote-validation.test.ts",
+    "test": "node --conditions=react-server --import tsx --test tests/quote-validation.test.ts tests/easypost.test.ts",
     "db:generate": "prisma generate",
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",

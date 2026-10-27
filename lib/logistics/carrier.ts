@@ -58,33 +58,42 @@ export async function lookupCarrier(trackingNumber: string): Promise<TrackingRes
 
   const endpoint = process.env.CARRIER_TRACKING_URL;
   const token = process.env.CARRIER_API_KEY;
-  if (endpoint && token) {
-    try {
-      const url = new URL(endpoint);
-      if (url.protocol !== "https:") throw new Error("Carrier endpoint must use HTTPS.");
-      url.searchParams.set("trackingNumber", parsed.data);
-      const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-        signal: AbortSignal.timeout(5000), cache: "no-store",
-      });
-      if (response.status === 404) return null;
-      if (!response.ok) throw new Error("Carrier provider returned an unsuccessful response.");
-      const result = carrierPayloadSchema.safeParse(await response.json());
-      if (!result.success) throw new Error("Carrier provider returned an invalid payload.");
-      const payload = result.data;
-      if (payload.trackingNumber && payload.trackingNumber.trim().toUpperCase() !== parsed.data.toUpperCase()) {
-        throw new Error("Carrier provider returned a different tracking number.");
+  let providerFailed = false;
+
+  if (endpoint || token) {
+    if (!endpoint || !token) {
+      providerFailed = true;
+    } else {
+      try {
+        const url = new URL(endpoint);
+        if (url.protocol !== "https:") throw new Error("Carrier endpoint must use HTTPS.");
+        url.searchParams.set("trackingNumber", parsed.data);
+        const response = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+          signal: AbortSignal.timeout(5000), cache: "no-store",
+        });
+        if (response.status !== 404) {
+          if (!response.ok) throw new Error("Carrier provider returned an unsuccessful response.");
+          const result = carrierPayloadSchema.safeParse(await response.json());
+          if (!result.success) throw new Error("Carrier provider returned an invalid payload.");
+          const payload = result.data;
+          if (payload.trackingNumber && payload.trackingNumber.trim().toUpperCase() !== parsed.data.toUpperCase()) {
+            throw new Error("Carrier provider returned a different tracking number.");
+          }
+          return {
+            trackingNumber: parsed.data, status: mapStatus(payload.status),
+            origin: payload.origin || null, destination: payload.destination || null,
+            carrier: payload.carrier || "External carrier",
+            estimatedDelivery: payload.estimatedDelivery ? new Date(payload.estimatedDelivery).toISOString() : null,
+            source: "carrier",
+          };
+        }
+        // A provider 404 is a genuine not-found result; still allow another
+        // configured provider to answer before returning not found.
+      } catch {
+        // Keep provider details and credentials out of logs and public errors.
+        providerFailed = true;
       }
-      return {
-        trackingNumber: parsed.data, status: mapStatus(payload.status),
-        origin: payload.origin || null, destination: payload.destination || null,
-        carrier: payload.carrier || "External carrier",
-        estimatedDelivery: payload.estimatedDelivery ? new Date(payload.estimatedDelivery).toISOString() : null,
-        source: "carrier",
-      };
-    } catch {
-      // Keep the existing generic-provider fallback behavior. Provider details
-      // are deliberately not exposed to the caller.
     }
   }
 
@@ -99,11 +108,11 @@ export async function lookupCarrier(trackingNumber: string): Promise<TrackingRes
       };
     } catch {
       // Never turn a carrier outage into a false "shipment not found" response.
-      // Mock data is only used when explicitly enabled; otherwise report 503.
-      if (process.env.ENABLE_MOCK_TRACKING !== "true") throw new CarrierLookupError();
+      providerFailed = true;
     }
   }
 
   if (process.env.ENABLE_MOCK_TRACKING === "true") return mockTracking(parsed.data);
+  if (providerFailed) throw new CarrierLookupError();
   return null;
 }

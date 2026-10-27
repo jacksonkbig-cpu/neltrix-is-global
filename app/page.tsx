@@ -115,7 +115,7 @@ export default function Home() {
     </section>
 
     <section className="track-section" id="track">
-      <div className="track-heading"><div className="track-icon"><Package/></div><div><h2>Track your shipment</h2><p>Tracking will be available after verified carrier integration is connected.</p></div></div>
+      <div className="track-heading"><div className="track-icon"><Package/></div><div><h2>Track your shipment</h2><p>Enter a tracking number to check available shipment updates.</p></div></div>
       <form className="track-form" onSubmit={trackShipment}>
         <label className="sr-only" htmlFor="tracking">Tracking number</label><input id="tracking" value={tracking} onChange={e=>{setTracking(e.target.value);setTrackMessage("");}} placeholder="Enter tracking number" />
         <button className="button primary" type="submit" disabled={trackBusy}>{trackBusy ? "Checking…" : "Track"} <ArrowRight size={17}/></button>

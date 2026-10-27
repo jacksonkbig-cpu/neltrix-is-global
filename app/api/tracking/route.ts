@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Shipment } from "@prisma/client";
 import { db } from "@/lib/db";
 import { CarrierLookupError, lookupCarrier } from "@/lib/logistics/carrier";
 import { trackingNumberSchema, trackingRequestSchema } from "@/lib/logistics/validation";
@@ -6,19 +7,41 @@ import { trackingNumberSchema, trackingRequestSchema } from "@/lib/logistics/val
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+type TrackingShipment = Pick<
+  Shipment,
+  "trackingNumber" | "status" | "origin" | "destination" | "carrier" | "estimatedDelivery"
+>;
+
+type TrackingDependencies = {
+  findShipment?: (trackingNumber: string) => Promise<TrackingShipment | null>;
+  lookupCarrier?: typeof lookupCarrier;
+};
+
 function error(message: string, status: number) {
   return NextResponse.json({ error: message }, { status, headers: { "Cache-Control": "no-store" } });
 }
 
-async function handleTracking(trackingNumber: unknown) {
+export async function handleTracking(
+  trackingNumber: unknown,
+  dependencies: TrackingDependencies = {},
+) {
   const parsed = trackingNumberSchema.safeParse(trackingNumber);
   if (!parsed.success) return error("Provide a valid tracking number.", 400);
 
+  const findShipment = dependencies.findShipment ?? (async (number: string) => db.shipment.findUnique({
+    where: { trackingNumber: number },
+    select: {
+      trackingNumber: true,
+      status: true,
+      origin: true,
+      destination: true,
+      carrier: true,
+      estimatedDelivery: true,
+    },
+  }));
+
   try {
-    const shipment = await db.shipment.findUnique({
-      where: { trackingNumber: parsed.data },
-      select: { trackingNumber: true, status: true, origin: true, destination: true, carrier: true, estimatedDelivery: true },
-    });
+    const shipment = await findShipment(parsed.data);
     if (shipment) {
       return NextResponse.json({
         tracking: {
@@ -31,7 +54,7 @@ async function handleTracking(trackingNumber: unknown) {
 
     // Only query the carrier after the database successfully confirms there is
     // no local record; this preserves local tracking as the source of truth.
-    const external = await lookupCarrier(parsed.data);
+    const external = await (dependencies.lookupCarrier ?? lookupCarrier)(parsed.data);
     if (external) return NextResponse.json({ tracking: external }, { headers: { "Cache-Control": "no-store" } });
     return error("Shipment not found", 404);
   } catch (cause) {

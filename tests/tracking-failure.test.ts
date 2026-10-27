@@ -1,8 +1,6 @@
-import test, { afterEach, beforeEach, mock } from "node:test";
+import test, { afterEach, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { NextRequest } from "next/server";
-import { db } from "../lib/db";
-import { GET } from "../app/api/tracking/route";
+import { handleTracking } from "../app/api/tracking/route";
 import { CarrierLookupError, lookupCarrier } from "../lib/logistics/carrier";
 
 const originalFetch = globalThis.fetch;
@@ -33,7 +31,6 @@ beforeEach(() => {
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
-  mock.restoreAll();
   for (const key of envKeys) {
     const value = originalEnv[key];
     if (value === undefined) delete process.env[key];
@@ -113,28 +110,21 @@ test("incomplete generic carrier configuration fails safely instead of returning
   await assert.rejects(() => lookupCarrier("TRACKING12345"), CarrierLookupError);
 });
 
-test("tracking route returns database shipment data without calling a carrier", async () => {
+test("tracking handler returns database shipment data without calling a carrier", async () => {
   const shipment = {
     trackingNumber: "TRACKING12345",
-    status: "IN_TRANSIT",
+    status: "IN_TRANSIT" as const,
     origin: "São Paulo",
     destination: "New York",
     carrier: "NELTRIX",
     estimatedDelivery: new Date("2026-10-30T12:00:00Z"),
   };
-  const delegate = db.shipment as unknown as {
-    findUnique: (...args: never[]) => Promise<unknown>;
-  };
-  mock.method(delegate, "findUnique", async () => shipment);
-  mockFetch(async () => {
-    throw new Error("Carrier must not be called when a database shipment exists");
+  const response = await handleTracking("TRACKING12345", {
+    findShipment: async () => shipment,
+    lookupCarrier: async () => {
+      throw new Error("Carrier must not be called when a database shipment exists");
+    },
   });
-  delete process.env.CARRIER_TRACKING_URL;
-  delete process.env.CARRIER_API_KEY;
-
-  const response = await GET(new NextRequest(
-    "https://example.test/api/tracking?trackingNumber=TRACKING12345",
-  ));
   const body = await response.json();
 
   assert.equal(response.status, 200);
@@ -143,39 +133,26 @@ test("tracking route returns database shipment data without calling a carrier", 
   assert.equal(body.tracking.estimatedDelivery, "2026-10-30T12:00:00.000Z");
 });
 
-test("tracking route returns 404 only when the database and configured carriers report not found", async () => {
-  const delegate = db.shipment as unknown as {
-    findUnique: (...args: never[]) => Promise<unknown>;
-  };
-  mock.method(delegate, "findUnique", async () => null);
-  delete process.env.CARRIER_TRACKING_URL;
-  delete process.env.CARRIER_API_KEY;
-
-  const response = await GET(new NextRequest(
-    "https://example.test/api/tracking?trackingNumber=TRACKING12345",
-  ));
+test("tracking handler returns 404 only when the database and configured carriers report not found", async () => {
+  const response = await handleTracking("TRACKING12345", {
+    findShipment: async () => null,
+    lookupCarrier: async () => null,
+  });
   const body = await response.json();
 
   assert.equal(response.status, 404);
   assert.equal(body.error, "Shipment not found");
 });
 
-test("tracking route returns a safe 503, not 404, when the database lookup fails", async () => {
-  const delegate = db.shipment as unknown as {
-    findUnique: (...args: never[]) => Promise<unknown>;
-  };
-  mock.method(delegate, "findUnique", async () => {
-    const error = new Error("sensitive database connection details");
-    error.name = "PrismaClientInitializationError";
-    Object.assign(error, { code: "P1001" });
-    throw error;
+test("tracking handler returns a safe 503, not 404, when the database lookup fails", async () => {
+  const response = await handleTracking("TRACKING12345", {
+    findShipment: async () => {
+      const error = new Error("sensitive database connection details");
+      error.name = "PrismaClientInitializationError";
+      Object.assign(error, { code: "P1001" });
+      throw error;
+    },
   });
-  delete process.env.CARRIER_TRACKING_URL;
-  delete process.env.CARRIER_API_KEY;
-
-  const response = await GET(new NextRequest(
-    "https://example.test/api/tracking?trackingNumber=TRACKING12345",
-  ));
   const body = await response.json();
 
   assert.equal(response.status, 503);
@@ -183,16 +160,12 @@ test("tracking route returns a safe 503, not 404, when the database lookup fails
   assert.doesNotMatch(JSON.stringify(body), /sensitive database connection details|P1001/);
 });
 
-test("tracking route returns a safe 503 for a generic carrier outage", async () => {
-  const delegate = db.shipment as unknown as {
-    findUnique: (...args: never[]) => Promise<unknown>;
-  };
-  mock.method(delegate, "findUnique", async () => null);
+test("tracking handler returns a safe 503 for a generic carrier outage", async () => {
   mockFetch(async () => new Response("private upstream detail", { status: 503 }));
 
-  const response = await GET(new NextRequest(
-    "https://example.test/api/tracking?trackingNumber=TRACKING12345",
-  ));
+  const response = await handleTracking("TRACKING12345", {
+    findShipment: async () => null,
+  });
   const body = await response.json();
 
   assert.equal(response.status, 503);

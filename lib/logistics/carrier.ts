@@ -14,6 +14,13 @@ export type TrackingResult = {
   source: "database" | "carrier" | "mock";
 };
 
+export class CarrierLookupError extends Error {
+  constructor() {
+    super("Carrier tracking provider is temporarily unavailable.");
+    this.name = "CarrierLookupError";
+  }
+}
+
 const carrierPayloadSchema = z.object({
   trackingNumber: z.string().trim().min(1).max(100).optional(),
   status: z.string().trim().min(1).max(80).optional(),
@@ -26,11 +33,23 @@ const carrierPayloadSchema = z.object({
 function mapStatus(status: string | undefined): TrackingResult["status"] {
   switch (status?.toLowerCase().replace(/[ -]/g, "_")) {
     case "pending": case "label_created": case "pre_transit": return "PENDING";
-    case "in_transit": case "out_for_delivery": return "IN_TRANSIT";
+    case "in_transit": case "out_for_delivery": case "available_for_pickup": return "IN_TRANSIT";
     case "delivered": return "DELIVERED";
-    case "exception": case "failed": case "delivery_exception": case "failure": return "EXCEPTION";
+    case "exception": case "failed": case "delivery_exception": case "failure": case "error": return "EXCEPTION";
     default: return "UNKNOWN";
   }
+}
+
+function mockTracking(trackingNumber: string): TrackingResult {
+  return {
+    trackingNumber,
+    status: "PENDING",
+    origin: null,
+    destination: null,
+    carrier: "Demo carrier (not live)",
+    estimatedDelivery: null,
+    source: "mock",
+  };
 }
 
 export async function lookupCarrier(trackingNumber: string): Promise<TrackingResult | null> {
@@ -64,23 +83,27 @@ export async function lookupCarrier(trackingNumber: string): Promise<TrackingRes
         source: "carrier",
       };
     } catch {
-      // An external provider outage must not turn tracking into an HTTP 500.
-      // Continue to the explicitly configured provider/mock fallback below.
+      // Keep the existing generic-provider fallback behavior. Provider details
+      // are deliberately not exposed to the caller.
     }
   }
 
   const provider = getCarrierProvider();
   if (provider) {
-    const result = await provider.getTracking(parsed.data);
-    if (result) return {
-      trackingNumber: result.trackingNumber, status: result.status,
-      origin: result.origin, destination: result.destination, carrier: result.carrier,
-      estimatedDelivery: result.estimatedDelivery, source: "carrier",
-    };
+    try {
+      const result = await provider.getTracking(parsed.data);
+      if (result) return {
+        trackingNumber: result.trackingNumber, status: result.status,
+        origin: result.origin, destination: result.destination, carrier: result.carrier,
+        estimatedDelivery: result.estimatedDelivery, source: "carrier",
+      };
+    } catch {
+      // Never turn a carrier outage into a false "shipment not found" response.
+      // Mock data is only used when explicitly enabled; otherwise report 503.
+      if (process.env.ENABLE_MOCK_TRACKING !== "true") throw new CarrierLookupError();
+    }
   }
 
-  if (process.env.ENABLE_MOCK_TRACKING === "true") {
-    return { trackingNumber: parsed.data, status: "PENDING", origin: null, destination: null, carrier: "Demo carrier (not live)", estimatedDelivery: null, source: "mock" };
-  }
+  if (process.env.ENABLE_MOCK_TRACKING === "true") return mockTracking(parsed.data);
   return null;
 }

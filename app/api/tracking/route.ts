@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { lookupCarrier } from "@/lib/logistics/carrier";
+import { CarrierLookupError, lookupCarrier } from "@/lib/logistics/carrier";
 import { trackingNumberSchema, trackingRequestSchema } from "@/lib/logistics/validation";
 
 export const runtime = "nodejs";
@@ -35,6 +35,10 @@ async function handleTracking(trackingNumber: unknown) {
     if (external) return NextResponse.json({ tracking: external }, { headers: { "Cache-Control": "no-store" } });
     return error("Shipment not found", 404);
   } catch (cause) {
+    if (cause instanceof CarrierLookupError) {
+      return error("Tracking provider is temporarily unavailable. Please try again later.", 503);
+    }
+
     // Log error class/code only. Do not log tracking numbers or customer data.
     const detail = cause && typeof cause === "object" ? cause as { name?: unknown; code?: unknown } : {};
     console.error("Tracking lookup failed", {
@@ -42,9 +46,8 @@ async function handleTracking(trackingNumber: unknown) {
       code: typeof detail.code === "string" ? detail.code : undefined,
     });
 
-    // The public API deliberately returns a non-enumerating response for failed
-    // lookups. The operational error is still logged above for alerting.
-    return error("Shipment not found", 404);
+    // Avoid exposing database or provider internals in the public response.
+    return error("Tracking is temporarily unavailable. Please try again later.", 503);
   }
 }
 

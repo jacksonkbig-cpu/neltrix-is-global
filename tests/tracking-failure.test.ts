@@ -1,6 +1,6 @@
 import test, { afterEach, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { handleTracking } from "../app/api/tracking/route";
+import { handleTracking } from "../lib/logistics/tracking-handler";
 import { CarrierLookupError, lookupCarrier } from "../lib/logistics/carrier";
 
 const originalFetch = globalThis.fetch;

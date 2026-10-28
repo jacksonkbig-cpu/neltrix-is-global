@@ -7,6 +7,27 @@ const processStartedAt = Date.now();
 
 type Check = "connected" | "incomplete" | "unavailable";
 
+function safeUrlSummary(value: string | undefined) {
+  if (!value) return { configured: false };
+  try {
+    const url = new URL(value);
+    return {
+      configured: true,
+      protocol: url.protocol,
+      hostname: url.hostname,
+      port: url.port || null,
+      username: url.username,
+      database: url.pathname.replace(/^\\/+/, ""),
+      passwordPresent: Boolean(url.password),
+      sslmode: url.searchParams.get("sslmode"),
+      pgbouncer: url.searchParams.get("pgbouncer"),
+      connectionLimit: url.searchParams.get("connection_limit"),
+    };
+  } catch {
+    return { configured: true, format: "invalid_url" };
+  }
+}
+
 async function tableExists(table: string): Promise<boolean> {
   const relation = ["User", "Shipment", "ShipmentNote", "Quote", "Ticket", "ChatMessage", "AuditLog"].includes(table)
     ? `public."${table}"`
@@ -59,7 +80,17 @@ export async function GET() {
       checks: { database, prismaSchema, supabaseIntakeSchema },
       // Diagnostics are limited to non-production deployments and never contain
       // connection strings, credentials, or the raw database error message.
-      ...(process.env.VERCEL_ENV !== "production" ? { diagnostics: { database: diagnostic } } : {}),
+      ...(process.env.VERCEL_ENV !== "production" ? {
+        diagnostics: {
+          database: diagnostic,
+          connection: {
+            databaseUrl: safeUrlSummary(process.env.DATABASE_URL),
+            directUrl: safeUrlSummary(process.env.DIRECT_URL),
+            postgresPrismaUrlPresent: Boolean(process.env.POSTGRES_PRISMA_URL),
+            postgresNonPoolingUrlPresent: Boolean(process.env.POSTGRES_URL_NON_POOLING),
+          },
+        },
+      } : {}),
       timestamp: new Date().toISOString(),
     }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }

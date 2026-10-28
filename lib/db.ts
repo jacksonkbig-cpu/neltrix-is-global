@@ -10,6 +10,37 @@ if (!process.env.DIRECT_URL && process.env.POSTGRES_URL_NON_POOLING) {
   process.env.DIRECT_URL = process.env.POSTGRES_URL_NON_POOLING;
 }
 
+/**
+ * Supabase's shared transaction pooler (port 6543) does not support Prisma's
+ * default prepared-statement behavior. Configure only that endpoint here so
+ * a missing URL query parameter cannot cause intermittent raw/model query
+ * failures in Vercel serverless functions. Never log or expose the URL.
+ */
+function configureSupabaseTransactionPooler(connectionString: string): string {
+  try {
+    const url = new URL(connectionString);
+    if (
+      url.port !== "6543" ||
+      !url.hostname.endsWith(".pooler.supabase.com")
+    ) {
+      return connectionString;
+    }
+
+    url.searchParams.set("pgbouncer", "true");
+    if (!url.searchParams.has("connection_limit")) {
+      url.searchParams.set("connection_limit", "1");
+    }
+    return url.toString();
+  } catch {
+    // Let Prisma report invalid connection strings through normal safe errors.
+    return connectionString;
+  }
+}
+
+if (process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = configureSupabaseTransactionPooler(process.env.DATABASE_URL);
+}
+
 const globalForPrisma = globalThis as typeof globalThis & {
   prisma?: PrismaClient;
 };

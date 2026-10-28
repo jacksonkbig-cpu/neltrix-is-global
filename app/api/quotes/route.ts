@@ -11,21 +11,46 @@ function jsonError(message: string, status: number) {
   return NextResponse.json({ error: message }, { status, headers: { "Cache-Control": "no-store" } });
 }
 
+/**
+ * Accept the canonical site origin and this exact Vercel deployment origin.
+ * VERCEL_URL is injected by Vercel per deployment, so Preview deployments work
+ * without trusting arbitrary *.vercel.app domains or weakening the origin check.
+ */
 function originAllowed(request: NextRequest): NextResponse | null {
   const origin = request.headers.get("origin");
   const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  const deploymentHost = process.env.VERCEL_URL;
+
   if (process.env.NODE_ENV === "production" && !configuredSiteUrl) {
     return jsonError("Quote requests are temporarily unavailable.", 503);
   }
-  if (origin && configuredSiteUrl) {
+
+  if (origin) {
     try {
-      if (new URL(origin).origin !== new URL(configuredSiteUrl).origin) {
+      const requestOrigin = new URL(origin).origin;
+      const allowedOrigins = new Set<string>();
+
+      if (configuredSiteUrl) {
+        allowedOrigins.add(new URL(configuredSiteUrl).origin);
+      }
+
+      // VERCEL_URL is a host name (no scheme) supplied by the Vercel runtime.
+      // Compare exact origins; do not use suffix/substring matching.
+      if (deploymentHost && /^[a-z0-9.-]+(?::\d+)?$/i.test(deploymentHost)) {
+        allowedOrigins.add(new URL(`https://${deploymentHost}`).origin);
+      }
+
+      if (allowedOrigins.size > 0 && !allowedOrigins.has(requestOrigin)) {
         return jsonError("Request origin is not allowed.", 403);
+      }
+      if (allowedOrigins.size === 0 && process.env.NODE_ENV === "production") {
+        return jsonError("Quote requests are temporarily unavailable.", 503);
       }
     } catch {
       return jsonError("Site URL configuration is invalid.", 503);
     }
   }
+
   return null;
 }
 

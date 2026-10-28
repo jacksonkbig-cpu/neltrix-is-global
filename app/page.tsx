@@ -38,7 +38,7 @@ export default function Home() {
       const result = await response.json() as { tracking?: { status?: string; carrier?: string | null; origin?: string | null; destination?: string | null; estimatedDelivery?: string | null; source?: string }; error?: string };
       if (!response.ok || !result.tracking) {
         setTrackMessage(response.status === 404
-          ? "No shipment was found for that tracking number. Check it and try again. External carrier tracking is not connected yet."
+          ? "No shipment was found for that tracking number. Check the number and try again, or contact support if you expected a carrier update."
           : result.error ?? "Tracking is temporarily unavailable. Please try again later.");
         return;
       }
@@ -115,7 +115,7 @@ export default function Home() {
     </section>
 
     <section className="track-section" id="track">
-      <div className="track-heading"><div className="track-icon"><Package/></div><div><h2>Track your shipment</h2><p>Tracking will be available after verified carrier integration is connected.</p></div></div>
+      <div className="track-heading"><div className="track-icon"><Package/></div><div><h2>Track your shipment</h2><p>Enter a tracking number to check available shipment updates.</p></div></div>
       <form className="track-form" onSubmit={trackShipment}>
         <label className="sr-only" htmlFor="tracking">Tracking number</label><input id="tracking" value={tracking} onChange={e=>{setTracking(e.target.value);setTrackMessage("");}} placeholder="Enter tracking number" />
         <button className="button primary" type="submit" disabled={trackBusy}>{trackBusy ? "Checking…" : "Track"} <ArrowRight size={17}/></button>

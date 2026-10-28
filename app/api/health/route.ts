@@ -33,7 +33,25 @@ export async function GET() {
   try {
     await db.$queryRaw`SELECT 1`;
     database = "connected";
-  } catch {
+  } catch (error) {
+    // Emit a safe diagnostic category to deployment logs; never log raw connection
+    // strings, passwords, query parameters, or complete Prisma error messages.
+    const failure = error && typeof error === "object"
+      ? error as { name?: unknown; code?: unknown; message?: unknown }
+      : undefined;
+    const message = typeof failure?.message === "string" ? failure.message.toLowerCase() : "";
+    const reason =
+      /authentication failed|password authentication|invalid credentials/.test(message) ? "authentication_failed" :
+      /can't reach database server|could not connect|connection refused|econnrefused|etimedout|timed out|timeout/.test(message) ? "database_unreachable" :
+      /malformed connection string|invalid .*url|datasource.*url|must start with/.test(message) ? "invalid_connection_config" :
+      /database .*does not exist|unknown database/.test(message) ? "database_not_found" :
+      "database_query_failed";
+    const diagnostic = {
+      name: typeof failure?.name === "string" ? failure.name : "UnknownError",
+      code: typeof failure?.code === "string" ? failure.code : undefined,
+      reason,
+    };
+    console.error("[health] database connection failed", diagnostic);
     return Response.json({
       status: "degraded",
       service: "neltrix-web",

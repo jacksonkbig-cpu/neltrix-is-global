@@ -46,16 +46,20 @@ export async function GET() {
       /malformed connection string|invalid .*url|datasource.*url|must start with/.test(message) ? "invalid_connection_config" :
       /database .*does not exist|unknown database/.test(message) ? "database_not_found" :
       "database_query_failed";
-    console.error("[health] database connection failed", {
+    const diagnostic = {
       name: typeof failure?.name === "string" ? failure.name : "UnknownError",
       code: typeof failure?.code === "string" ? failure.code : undefined,
       reason,
-    });
+    };
+    console.error("[health] database connection failed", diagnostic);
     return Response.json({
       status: "degraded",
       service: "neltrix-web",
       uptimeSeconds: Math.max(0, Math.floor((Date.now() - processStartedAt) / 1000)),
       checks: { database, prismaSchema, supabaseIntakeSchema },
+      // Diagnostics are limited to non-production deployments and never contain
+      // connection strings, credentials, or the raw database error message.
+      ...(process.env.VERCEL_ENV !== "production" ? { diagnostics: { database: diagnostic } } : {}),
       timestamp: new Date().toISOString(),
     }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }

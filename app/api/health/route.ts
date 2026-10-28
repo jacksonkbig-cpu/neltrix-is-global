@@ -17,7 +17,7 @@ function safeUrlSummary(value: string | undefined) {
       hostname: url.hostname,
       port: url.port || null,
       username: url.username,
-      database: url.pathname.replace(/^\\/+/, ""),
+      database: url.pathname.replace(/^\/+/, ""),
       passwordPresent: Boolean(url.password),
       sslmode: url.searchParams.get("sslmode"),
       pgbouncer: url.searchParams.get("pgbouncer"),

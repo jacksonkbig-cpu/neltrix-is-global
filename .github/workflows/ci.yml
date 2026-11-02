@@ -11,6 +11,20 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: neltrix_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d neltrix_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -22,6 +36,38 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+
+      - name: Create Supabase roles for migration validation
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/neltrix_ci
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE ROLE service_role NOLOGIN BYPASSRLS;
+          SQL
+
+      - name: Apply historical and Phase 1 migrations to ephemeral PostgreSQL
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/neltrix_ci
+        run: |
+          for migration in \
+            prisma/migrations/202610170001_initial_logistics/migration.sql \
+            prisma/migrations/202610170002_support_operations/migration.sql \
+            prisma/migrations/202610170003_support_tables/migration.sql \
+            prisma/migrations/202610170004_shipment_notes/migration.sql \
+            prisma/migrations/202611020001_phase1_core_domain/migration.sql
+          do
+            echo "Applying $migration"
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+          done
+
+      - name: Verify Prisma schema matches the migrated database
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/neltrix_ci
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/neltrix_ci
+        run: npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
+
       - name: Lint
         run: npm run lint
       - name: TypeScript

@@ -115,7 +115,6 @@ model User {
   updatedAt        DateTime @updatedAt
 
   @@index([role])
-  @@index([authSubject])
 }
 
 model Organization {

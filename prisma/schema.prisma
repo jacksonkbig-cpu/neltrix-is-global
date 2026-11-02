@@ -16,10 +16,21 @@ enum UserRole {
 }
 
 enum ShipmentStatus {
+  // Legacy values remain while existing records and API consumers are migrated.
   PENDING
+  LABEL_CREATED
+  BOOKED
+  PICKED_UP
   IN_TRANSIT
+  AT_FACILITY
+  CUSTOMS_HOLD
+  OUT_FOR_DELIVERY
+  DELIVERY_ATTEMPTED
   DELIVERED
   EXCEPTION
+  RETURN_IN_TRANSIT
+  RETURNED
+  CANCELLED
 }
 
 enum QuoteStatus {
@@ -52,37 +63,197 @@ enum ChatSender {
   ADMIN
 }
 
+enum OrganizationType {
+  BUSINESS
+  INDIVIDUAL
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum OrganizationMemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+  BILLING
+}
+
+enum ShipmentEventSource {
+  CARRIER
+  INTERNAL
+  SYSTEM
+  ADMIN
+}
+
+enum IdempotencyStatus {
+  IN_PROGRESS
+  SUCCEEDED
+  FAILED
+}
+
 model User {
-  id           String      @id @default(cuid())
-  email        String      @unique
-  passwordHash String
-  role         UserRole    @default(USER)
-  shipments    Shipment[]
-  shipmentNotes ShipmentNote[]
-  tickets      Ticket[]
-  auditLogs    AuditLog[]
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id               String   @id @default(cuid())
+  email            String   @unique
+  // Supabase Auth is the identity provider; passwordHash remains nullable for
+  // legacy/imported accounts and is not used for Supabase-authenticated users.
+  authSubject      String?  @unique
+  passwordHash     String?
+  role             UserRole @default(USER)
+  shipments        Shipment[]
+  shipmentNotes    ShipmentNote[]
+  tickets          Ticket[]
+  auditLogs        AuditLog[]
+  addresses        Address[] @relation("UserAddresses")
+  organizationMemberships OrganizationMember[]
+  roleAssignments  RoleAssignment[] @relation("RoleAssignmentUser")
+  roleGrants       RoleAssignment[] @relation("RoleAssignmentGrantor")
+  shipmentEvents   ShipmentEvent[] @relation("ShipmentEventActor")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@index([role])
+  @@index([authSubject])
+}
+
+model Organization {
+  id             String             @id @default(cuid())
+  name           String
+  type           OrganizationType   @default(BUSINESS)
+  status         OrganizationStatus @default(ACTIVE)
+  billingEmail   String?
+  taxIdentifier  String?
+  members        OrganizationMember[]
+  addresses      Address[]
+  shipments      Shipment[]
+  roleAssignments RoleAssignment[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([status, createdAt])
+  @@index([type, name])
+}
+
+model OrganizationMember {
+  organizationId String
+  userId         String
+  role           OrganizationMemberRole @default(MEMBER)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, userId])
+  @@index([userId, role])
+}
+
+model Address {
+  id                    String   @id @default(cuid())
+  ownerId               String?
+  organizationId        String?
+  label                 String?
+  contactName           String
+  companyName           String?
+  phone                 String?
+  email                 String?
+  addressLine1          String
+  addressLine2          String?
+  city                  String
+  region                String?
+  postalCode            String
+  countryCode           String   @db.Char(2)
+  residential           Boolean  @default(false)
+  validatedAt           DateTime?
+  validationProvider    String?
+  validationReference   String?
+  owner                 User?    @relation("UserAddresses", fields: [ownerId], references: [id], onDelete: SetNull)
+  organization          Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  senderShipments       Shipment[] @relation("ShipmentSenderAddress")
+  recipientShipments    Shipment[] @relation("ShipmentRecipientAddress")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([ownerId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([countryCode, postalCode])
 }
 
 model Shipment {
-  id                String         @id @default(cuid())
-  trackingNumber    String         @unique
-  status            ShipmentStatus @default(PENDING)
-  origin            String
-  destination       String
-  carrier           String
-  estimatedDelivery DateTime?
-  userId            String?
-  user              User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  id                     String         @id @default(cuid())
+  trackingNumber         String         @unique
+  carrierTrackingNumber  String?
+  status                 ShipmentStatus @default(PENDING)
+  origin                 String
+  destination            String
+  carrier                String
+  serviceCode            String?
+  currency               String?        @db.Char(3)
+  quotedAmountMinor      BigInt?
+  estimatedDelivery      DateTime?
+  userId                 String?
+  organizationId         String?
+  senderAddressId        String?
+  recipientAddressId     String?
+  user                   User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organization           Organization?  @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  senderAddress          Address?       @relation("ShipmentSenderAddress", fields: [senderAddressId], references: [id], onDelete: SetNull)
+  recipientAddress       Address?       @relation("ShipmentRecipientAddress", fields: [recipientAddressId], references: [id], onDelete: SetNull)
+  packages               ShipmentPackage[]
+  events                 ShipmentEvent[]
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+  notes                  ShipmentNote[]
 
   @@index([userId, createdAt])
+  @@index([organizationId, status, createdAt])
   @@index([status, updatedAt])
-  notes             ShipmentNote[]
+  @@index([carrier, carrierTrackingNumber])
+}
+
+model ShipmentPackage {
+  id                    String   @id @default(cuid())
+  shipmentId            String
+  packageNumber         Int      @default(1)
+  weightGrams           Int
+  lengthMm              Int
+  widthMm               Int
+  heightMm              Int
+  declaredValueMinor    BigInt?
+  declaredValueCurrency String?  @db.Char(3)
+  contentsDescription   String?  @db.Text
+  shipment              Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  createdAt             DateTime @default(now())
+
+  @@unique([shipmentId, packageNumber])
+  @@index([shipmentId])
+}
+
+model ShipmentEvent {
+  id                    String              @id @default(cuid())
+  shipmentId            String
+  eventKey              String              @unique
+  status                ShipmentStatus
+  description           String              @db.Text
+  originalStatusCode    String?
+  source                ShipmentEventSource
+  sourceIntegration     String?
+  sourceReference       String?
+  locationName          String?
+  locationCity          String?
+  locationRegion        String?
+  locationCountryCode   String?             @db.Char(2)
+  occurredAt            DateTime
+  ingestedAt            DateTime            @default(now())
+  metadata              Json?
+  actorId               String?
+  shipment              Shipment            @relation(fields: [shipmentId], references: [id], onDelete: Restrict)
+  actor                 User?               @relation("ShipmentEventActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([shipmentId, occurredAt])
+  @@index([sourceIntegration, sourceReference])
+  @@index([status, occurredAt])
 }
 
 model ShipmentNote {
@@ -116,17 +287,17 @@ model Quote {
 }
 
 model Ticket {
-  id           String          @id @default(cuid())
-  ticketNumber String          @unique
-  userId       String?
-  user         User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id            String         @id @default(cuid())
+  ticketNumber  String         @unique
+  userId        String?
+  user          User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
   customerEmail String?
-  status       TicketStatus    @default(OPEN)
-  priority     TicketPriority  @default(NORMAL)
-  subject      String
-  messages     ChatMessage[]
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  status        TicketStatus   @default(OPEN)
+  priority      TicketPriority @default(NORMAL)
+  subject       String
+  messages      ChatMessage[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   @@index([status, priority, updatedAt])
   @@index([userId, createdAt])
@@ -157,4 +328,72 @@ model AuditLog {
   @@index([userId, timestamp])
   @@index([timestamp])
   @@index([action, timestamp])
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  key         String           @unique
+  name        String
+  description String?
+  isSystem    Boolean          @default(false)
+  permissions RolePermission[]
+  assignments RoleAssignment[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Permission {
+  id          String           @id @default(cuid())
+  key         String           @unique
+  description String?
+  roles       RolePermission[]
+  createdAt   DateTime         @default(now())
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model RoleAssignment {
+  id           String        @id @default(cuid())
+  userId       String
+  roleId       String
+  organizationId String?
+  // GLOBAL for platform-wide assignments, ORG:<organizationId> for scoped roles.
+  scopeKey     String        @default("GLOBAL")
+  assignedById String?
+  user         User          @relation("RoleAssignmentUser", fields: [userId], references: [id], onDelete: Cascade)
+  role         Role          @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignedBy   User?         @relation("RoleAssignmentGrantor", fields: [assignedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime      @default(now())
+
+  @@unique([userId, roleId, scopeKey])
+  @@index([organizationId, roleId])
+  @@index([userId, organizationId])
+}
+
+model IdempotencyRecord {
+  id              String            @id @default(cuid())
+  scope           String            @db.VarChar(80)
+  key             String            @db.VarChar(200)
+  requestHash     String            @db.VarChar(128)
+  status          IdempotencyStatus @default(IN_PROGRESS)
+  responsePayload Json?
+  resourceType    String?
+  resourceId      String?
+  expiresAt       DateTime
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@unique([scope, key])
+  @@index([status, expiresAt])
+  @@index([resourceType, resourceId])
 }

@@ -282,7 +282,7 @@ VALUES
   ('permission_shipment_read_assigned', 'shipment.read.assigned', 'Read shipments assigned to the authenticated driver.'),
   ('permission_shipment_read_all', 'shipment.read.all', 'Read all shipments; platform administrator only.'),
   ('permission_shipment_read_operations', 'shipment.read.operations', 'Read shipments within assigned operational facility or region.'),
-  ('permission_shipment_read_dispatch_queue', 'shipment.read.dispatch_queue', 'Read shipments eligible for the dispatcher's assigned queues.'),
+  ('permission_shipment_read_dispatch_queue', 'shipment.read.dispatch_queue', 'Read shipments eligible for assigned dispatch queues.'),
   ('permission_shipment_read_support', 'shipment.read.support', 'Read only the shipment details permitted for customer support.'),
   ('permission_shipment_read_audit', 'shipment.read.audit', 'Read shipment event metadata within an authorized audit investigation.'),
   ('permission_shipment_update_own', 'shipment.update.own', 'Request changes to eligible owned shipments.'),

@@ -12,13 +12,14 @@
 - Multiple package records per shipment, using integer grams and millimetres and minor-unit declared values.
 - A dedicated shipment event history with source, original carrier code, provider reference, occurrence/ingestion timestamps, location and metadata.
 - Append-only enforcement for shipment events at the database level. Corrections are new events; old events are not edited or deleted.
-- A permission catalog, system role templates, organization-scoped role assignments and explicit role-permission joins.
+- A permission catalog, system role templates, organization-scoped role assignments and explicit role-permission joins. Non-administrator staff templates use separately named operational, dispatch-queue, support and audit read permissions rather than granting every staff role unrestricted shipment access.
 - An idempotency-record table for retry-safe API operations.
 - Expanded shipment lifecycle values while retaining the legacy `PENDING`, `IN_TRANSIT`, `DELIVERED` and `EXCEPTION` values.
 
 ## Security and compatibility decisions
 
 - No user is automatically granted a new role. The migration seeds role/permission definitions only; role assignment requires an explicit trusted administrative workflow.
+- The platform administrator is the only seeded role with `shipment.read.all`. Operations, dispatch, support and audit roles receive differently scoped read permissions. Those permissions remain catalog metadata until backend checks enforce their scopes; they must not be treated as active access controls yet.
 - Existing Supabase staff authorization and customer sign-in flows remain in place for compatibility. The new RBAC tables are the foundation for a later, separately tested authorization cutover; this change does not claim that every existing endpoint now enforces the new permission catalog.
 - New tables have RLS enabled and direct `anon`/`authenticated` table privileges revoked. Server-side database access remains the intended application path.
 - Existing shipment records are not rewritten. The new address, organization, package and carrier-reference columns are nullable to permit staged backfill.

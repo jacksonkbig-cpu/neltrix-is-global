@@ -38,3 +38,14 @@ Use an edge/WAF rule and a shared rate-limit store for public tracking and quote
 ## Rollback
 
 Do not drop Supabase tables as part of this rollout. Prefer forward-only corrective migrations for production data. Reverting application routing is separate from reverting database structure; keep verified backups and test restore procedures before relying on them.
+
+
+## Production preflight evidence — 2026-11-02
+
+See [PRODUCTION-DATABASE-PREFLIGHT-2026-11-02.md](./PRODUCTION-DATABASE-PREFLIGHT-2026-11-02.md) for the read-only inspection results. In summary:
+
+- Eight Supabase-managed migrations are recorded, including the migration that created the Prisma logistics tables. This is separate from Prisma's own migration ledger.
+- The seven original Prisma tables, their baseline indexes, and all original enum values are present.
+- `public._prisma_migrations` is absent. The migration history must be reconciled before Prisma deploy.
+- RLS is enabled on the seven original application tables. The inspection found no table policies; grants were present for `service_role` and `postgres`, but not `anon` or `authenticated`.
+- The live database contains one `Quote` row. Preserve it; do not reset or recreate the existing schema.

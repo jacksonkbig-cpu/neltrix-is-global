@@ -8,7 +8,8 @@ const processStartedAt = Date.now();
 type Check = "connected" | "incomplete" | "unavailable";
 
 async function tableExists(table: string): Promise<boolean> {
-  const relation = ["User", "Shipment", "ShipmentNote", "Quote", "Ticket", "ChatMessage", "AuditLog"].includes(table)
+  const prismaTableNames = new Set(["User","Shipment","ShipmentNote","Quote","Ticket","ChatMessage","AuditLog","Organization","OrganizationMember","Address","ShipmentPackage","ShipmentEvent","Role","Permission","RolePermission","RoleAssignment","IdempotencyRecord"]);
+  const relation = prismaTableNames.has(table)
     ? `public."${table}"`
     : `public.${table}`;
   const rows = await db.$queryRaw<Array<{ exists: boolean }>>`
@@ -63,6 +64,8 @@ export async function GET() {
 
   const prismaTables = [
     "User", "Shipment", "ShipmentNote", "Quote", "Ticket", "ChatMessage", "AuditLog",
+    "Organization", "OrganizationMember", "Address", "ShipmentPackage", "ShipmentEvent",
+    "Role", "Permission", "RolePermission", "RoleAssignment", "IdempotencyRecord",
   ];
   const prismaResults = await Promise.all(prismaTables.map((table) => safeCheck(() => tableExists(table))));
   prismaSchema = prismaResults.every((result) => result === "connected")

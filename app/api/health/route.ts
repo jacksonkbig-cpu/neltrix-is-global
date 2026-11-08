@@ -7,8 +7,14 @@ const processStartedAt = Date.now();
 
 type Check = "connected" | "incomplete" | "unavailable";
 
+const prismaTables = [
+  "User", "Shipment", "ShipmentNote", "Quote", "Ticket", "ChatMessage", "AuditLog",
+  "Organization", "OrganizationMember", "Address", "ShipmentPackage", "ShipmentEvent",
+  "Role", "Permission", "RolePermission", "RoleAssignment", "IdempotencyRecord",
+];
+const prismaTableNames = new Set(prismaTables);
+
 async function tableExists(table: string): Promise<boolean> {
-  const prismaTableNames = new Set(["User","Shipment","ShipmentNote","Quote","Ticket","ChatMessage","AuditLog","Organization","OrganizationMember","Address","ShipmentPackage","ShipmentEvent","Role","Permission","RolePermission","RoleAssignment","IdempotencyRecord"]);
   const relation = prismaTableNames.has(table)
     ? `public."${table}"`
     : `public.${table}`;
@@ -62,11 +68,6 @@ export async function GET() {
     }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
 
-  const prismaTables = [
-    "User", "Shipment", "ShipmentNote", "Quote", "Ticket", "ChatMessage", "AuditLog",
-    "Organization", "OrganizationMember", "Address", "ShipmentPackage", "ShipmentEvent",
-    "Role", "Permission", "RolePermission", "RoleAssignment", "IdempotencyRecord",
-  ];
   const prismaResults = await Promise.all(prismaTables.map((table) => safeCheck(() => tableExists(table))));
   prismaSchema = prismaResults.every((result) => result === "connected")
     ? "connected"
